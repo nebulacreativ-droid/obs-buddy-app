@@ -595,8 +595,17 @@ function AssistantPage() {
           )}
         </section>
 
-        {/* RIGHT: dashboard */}
-        <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
+        {/* RIGHT: dashboard
+            Cap dur en pixels + scroll interne pour ne pas étirer la row à chaque
+            nouvelle reco. En embed (iframe) on évite le viewport-relatif (100vh
+            suit la hauteur de l'iframe). En standalone on garde la stickiness. */}
+        <aside
+          className={
+            isEmbed
+              ? "min-w-0 max-h-[640px] overflow-y-auto"
+              : "min-w-0 max-h-[640px] overflow-y-auto lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-3rem)]"
+          }
+        >
           {isOuverture ? (
             <InsightsPanel
               insights={insights}
