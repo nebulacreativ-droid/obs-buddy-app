@@ -36,7 +36,11 @@ export type Marque = {
   lien: string;
 };
 
-export const PRODUITS = produits as Produit[];
+// Exclut les échantillons / samples des recommandations (tailles 10g, mini formats…).
+// Détection par nom : "Echantillon X" ou "X Sample" — robuste aux variations de casse.
+const isSample = (p: Produit) => /^\s*echantillon\b|\bsample\b/i.test(p.nom);
+
+export const PRODUITS = (produits as Produit[]).filter((p) => !isSample(p));
 export const MARQUES = marques as Marque[];
 
 export const produitsByType = (types: string[]) =>
