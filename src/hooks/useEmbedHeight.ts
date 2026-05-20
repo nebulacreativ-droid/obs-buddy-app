@@ -15,12 +15,24 @@ export function useEmbedHeight() {
     let timeoutId: number | null = null;
     let lastSent = 0;
 
+    const measureHeight = (): number => {
+      // Préférer le container de contenu si présent : il ne risque pas
+      // d'être gonflé par un min-h-screen (100vh) qui synchronise sa
+      // hauteur sur celle de l'iframe et provoque un feedback loop.
+      const root = document.getElementById('obs-embed-root');
+      if (root) {
+        const rect = root.getBoundingClientRect();
+        return Math.ceil(rect.height);
+      }
+      return document.body.scrollHeight;
+    };
+
     const sendHeight = () => {
       if (timeoutId) window.clearTimeout(timeoutId);
 
       timeoutId = window.setTimeout(() => {
         timeoutId = null;
-        const height = document.body.scrollHeight;
+        const height = measureHeight();
 
         // Toujours envoyer si la hauteur diminue (retour arrière dans un Form),
         // sinon ignorer les micro-variations.

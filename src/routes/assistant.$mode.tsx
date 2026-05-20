@@ -323,6 +323,7 @@ function AssistantPage() {
             <div className="flex items-center gap-2">
               <Link
                 to="/"
+                search={{ embed: 1 }}
                 className="tap-target flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground"
               >
                 <ArrowLeft className="h-3 w-3" />
