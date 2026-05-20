@@ -1,0 +1,185 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-display: "Anton", "Bebas Neue", "Oswald", "Arial Black", system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Montserrat", "Inter", system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brass: var(--brass);
+  --color-oxblood: var(--oxblood);
+  --color-cream: var(--cream);
+  --color-ink: var(--ink);
+  --color-leather: var(--leather);
+  --color-gold: var(--gold);
+}
+
+:root {
+  --radius: 0.125rem;
+
+  /* O'Barbershop — BRANDNEWGOLD / Hype-Sauvage */
+  --gold: oklch(0.91 0.19 100);            /* BRANDNEWGOLD jaune punchy */
+  --gold-deep: oklch(0.82 0.18 95);        /* hover / contraste */
+  --ink: oklch(0.16 0 0);                  /* noir café */
+  --paper: #ffffff;                        /* fond blanc app */
+  --smoke: oklch(0.94 0 0);                /* gris très clair */
+  --rouge: oklch(0.55 0.22 27);            /* rouge alerte / accent vif */
+
+  /* Backward compat (existing components ref these) */
+  --cream: var(--paper);
+  --leather: oklch(0.32 0 0);
+  --brass: var(--gold);
+  --oxblood: var(--rouge);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--gold);
+  --secondary: var(--smoke);
+  --secondary-foreground: var(--ink);
+  --muted: var(--smoke);
+  --muted-foreground: oklch(0.45 0 0);
+  --accent: var(--gold);
+  --accent-foreground: var(--ink);
+  --destructive: var(--rouge);
+  --destructive-foreground: var(--paper);
+  --border: oklch(0.88 0 0);
+  --input: oklch(0.92 0 0);
+  --ring: var(--gold);
+}
+
+.dark {
+  --background: var(--ink);
+  --foreground: var(--paper);
+  --card: oklch(0.22 0 0);
+  --card-foreground: var(--paper);
+  --popover: oklch(0.22 0 0);
+  --popover-foreground: var(--paper);
+  --primary: var(--gold);
+  --primary-foreground: var(--ink);
+  --secondary: oklch(0.26 0 0);
+  --secondary-foreground: var(--paper);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.72 0 0);
+  --accent: var(--gold);
+  --accent-foreground: var(--ink);
+  --border: oklch(0.3 0 0);
+  --input: oklch(0.28 0 0);
+  --ring: var(--gold);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.005em;
+    text-transform: uppercase;
+  }
+  .font-serif { font-family: var(--font-serif); font-style: italic; }
+}
+
+/* Barber pole — version O'Barbershop (noir / blanc, diagonal) */
+@keyframes pole {
+  0%   { background-position: 0 0; }
+  100% { background-position: 0 28px; }
+}
+.barber-pole {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--ink) 0 7px,
+    var(--paper) 7px 14px
+  );
+  animation: pole 1.4s linear infinite;
+}
+.barber-pole-gold {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--ink) 0 8px,
+    var(--gold) 8px 16px
+  );
+  animation: pole 1.4s linear infinite;
+}
+
+/* Yellow tape — slab d'accent style "scotch jaune" */
+.tape {
+  background: var(--gold);
+  color: var(--ink);
+  display: inline-block;
+  padding: 0.15em 0.5em;
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+/* Brutal hard shadow */
+.shadow-brut {
+  box-shadow: 6px 6px 0 0 var(--ink);
+}
+.shadow-brut-gold {
+  box-shadow: 6px 6px 0 0 var(--gold);
+}
+
+/* Cartouche / ticket conservé pour compat */
+.ticket {
+  background: var(--card);
+  border: 1.5px solid var(--ink);
+  position: relative;
+}
+
+.divider-stitched { border-top: 1px dashed var(--ink); }
+
+.tap-target { -webkit-tap-highlight-color: transparent; }
+
+html.embed-mode,
+html.embed-mode body {
+  background: transparent !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Stripe noise — toile de fond */
+.bg-grid-ink {
+  background-image:
+    linear-gradient(var(--ink) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ink) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+  opacity: 0.04;
+}
