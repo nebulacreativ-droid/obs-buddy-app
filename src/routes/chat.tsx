@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, ExternalLink, RotateCcw } from "lucide-react";
+import { ArrowRight, ArrowUp, ExternalLink, RotateCcw } from "lucide-react";
 import {
   streamChat,
   decouperMessage,
@@ -20,13 +20,28 @@ export const Route = createFileRoute("/chat")({
 });
 
 const ACCUEIL =
-  "Salut, c'est O'Buddy 👋 Je connais le catalogue O'Barbershop par cœur. Dis-moi ce que tu cherches.";
+  "Salut, c'est O'Buddy 👋 Je connais le catalogue O'Barbershop par cœur. Par quoi on commence ?";
 
-const SUGGESTIONS = [
-  "Une cire mate pour cheveux épais",
-  "J'ouvre mon barbershop, par où je commence ?",
-  "Quelle tondeuse pour faire des fades ?",
-  "Comment entretenir mes lames ?",
+// Les 3 parcours historiques de l'assistant, désormais menés en conversation.
+const PARCOURS = [
+  {
+    eyebrow: "Particulier",
+    titre: "Ma routine perso",
+    desc: "Cheveux, barbe, peau",
+    message: "Je veux me composer une routine perso.",
+  },
+  {
+    eyebrow: "Pro barbier",
+    titre: "Mon matériel pro",
+    desc: "Tondeuses, ciseaux, rasoirs",
+    message: "Je cherche du matériel pro pour mon activité de barbier.",
+  },
+  {
+    eyebrow: "Pro ouverture",
+    titre: "J'ouvre mon shop",
+    desc: "Matos, mobilier, revente",
+    message: "J'ouvre mon barbershop, aide-moi à monter le projet.",
+  },
 ];
 
 function ChatPage() {
@@ -142,14 +157,21 @@ function ChatPage() {
           </Bulle>
 
           {vide && (
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTIONS.map((s) => (
+            <div className="flex flex-col gap-2">
+              {PARCOURS.map((p) => (
                 <button
-                  key={s}
-                  onClick={() => envoyer(s)}
-                  className="tap-target rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs transition hover:border-foreground/40 hover:-translate-y-0.5"
+                  key={p.titre}
+                  onClick={() => envoyer(p.message)}
+                  className="tap-target group flex items-center gap-3 rounded-sm border border-border bg-card px-3 py-2.5 text-left transition hover:border-foreground/40 hover:-translate-y-0.5"
                 >
-                  {s}
+                  <div className="flex-1">
+                    <div className="text-[9px] uppercase tracking-[0.25em] text-muted-foreground">
+                      {p.eyebrow}
+                    </div>
+                    <div className="font-display text-lg leading-tight">{p.titre}</div>
+                    <div className="text-xs text-muted-foreground">{p.desc}</div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-foreground" />
                 </button>
               ))}
             </div>
