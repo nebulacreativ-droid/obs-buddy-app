@@ -6,14 +6,15 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 /** Demande de compte professionnel, validée côté serveur avant affichage. */
 export type DemandePro = {
-  societe: string;
-  siret: string;
   nom: string;
   email: string;
   telephone: string;
+  message: string;
+  rappel: string;
+  societe: string;
+  siret: string;
   activite: string;
   ville: string;
-  precisions: string;
 };
 
 export type EvenementChat =

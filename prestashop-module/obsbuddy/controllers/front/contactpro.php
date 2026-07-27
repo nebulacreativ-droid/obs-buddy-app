@@ -81,29 +81,39 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
         };
 
         $email = $lire('email', self::MAX_CHAMP);
-        $siret = preg_replace('/\s+/', '', $lire('siret', 40));
-        $societe = $lire('societe', self::MAX_CHAMP);
         $nom = $lire('nom', self::MAX_CHAMP);
+        $telephone = $lire('telephone', 40);
+        $message = $lire('message', self::MAX_MESSAGE);
+        $siret = preg_replace('/\s+/', '', $lire('siret', 40));
 
         if (!Validate::isEmail($email)) {
             return ['erreur' => "L'adresse email n'est pas valide."];
         }
-        if (!preg_match('/^\d{14}$/', $siret)) {
-            return ['erreur' => 'Le SIRET doit comporter 14 chiffres.'];
+        if ($nom === '') {
+            return ['erreur' => 'Le nom est obligatoire.'];
         }
-        if ($societe === '' || $nom === '') {
-            return ['erreur' => 'La raison sociale et le nom sont obligatoires.'];
+        if (strlen(preg_replace('/\D/', '', $telephone)) < 9) {
+            return ['erreur' => "Le numéro de téléphone n'est pas valide."];
+        }
+        if ($message === '') {
+            return ['erreur' => 'Merci de préciser votre demande.'];
+        }
+        // Société et SIRET sont facultatifs : un projet en création n'est pas
+        // encore immatriculé. Mais un SIRET fourni doit être bien formé.
+        if ($siret !== '' && !preg_match('/^\d{14}$/', $siret)) {
+            return ['erreur' => 'Le SIRET doit comporter 14 chiffres.'];
         }
 
         return [
             'email' => $email,
-            'siret' => $siret,
-            'societe' => $societe,
             'nom' => $nom,
-            'telephone' => $lire('telephone', 40),
+            'telephone' => $telephone,
+            'message' => $message,
+            'rappel' => $lire('rappel', 10) !== '',
+            'siret' => $siret,
+            'societe' => $lire('societe', self::MAX_CHAMP),
             'activite' => $lire('activite', self::MAX_CHAMP),
             'ville' => $lire('ville', self::MAX_CHAMP),
-            'precisions' => $lire('precisions', self::MAX_MESSAGE),
         ];
     }
 
@@ -114,21 +124,31 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
     protected function corpsDuMessage(array $c)
     {
         $lignes = [
-            'Demande de compte professionnel (via O\'Buddy)',
+            'Demande de contact professionnel (via O\'Buddy)',
             '',
-            'Raison sociale : ' . $c['societe'],
-            'SIRET : ' . $c['siret'],
             'Contact : ' . $c['nom'],
             'Email : ' . $c['email'],
-            'Téléphone : ' . ($c['telephone'] !== '' ? $c['telephone'] : 'non communiqué'),
-            'Activité : ' . ($c['activite'] !== '' ? $c['activite'] : 'non précisée'),
-            'Ville : ' . ($c['ville'] !== '' ? $c['ville'] : 'non précisée'),
+            'Téléphone : ' . $c['telephone'],
+            'Rappel souhaité : ' . ($c['rappel'] ? 'OUI' : 'non'),
         ];
 
-        if ($c['precisions'] !== '') {
-            $lignes[] = '';
-            $lignes[] = 'Précisions : ' . $c['precisions'];
+        // Les champs facultatifs ne figurent que s'ils ont été renseignés :
+        // une ligne "non précisée" n'apporte rien à l'équipe.
+        $facultatifs = [
+            'Raison sociale' => $c['societe'],
+            'SIRET' => $c['siret'],
+            'Activité' => $c['activite'],
+            'Ville' => $c['ville'],
+        ];
+        foreach ($facultatifs as $libelle => $valeur) {
+            if ($valeur !== '') {
+                $lignes[] = $libelle . ' : ' . $valeur;
+            }
         }
+
+        $lignes[] = '';
+        $lignes[] = 'Demande :';
+        $lignes[] = $c['message'];
 
         return implode("\n", $lignes);
     }

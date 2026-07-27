@@ -258,14 +258,15 @@
 
     var corps = new URLSearchParams();
     var champs = [
-      "societe",
-      "siret",
       "nom",
       "email",
       "telephone",
+      "message",
+      "rappel",
+      "societe",
+      "siret",
       "activite",
       "ville",
-      "precisions",
     ];
     for (var i = 0; i < champs.length; i++) {
       corps.append(champs[i], String(donnees[champs[i]] || ""));

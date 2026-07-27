@@ -19,6 +19,11 @@ import type { ProduitCompact } from "@/lib/product-search";
 import type { MarqueProposee } from "@/lib/marques-search";
 import type { DemandePro } from "@/lib/chat-client";
 import { BookingWidget } from "@/components/BookingWidget";
+import {
+  chargerConversation,
+  sauvegarderConversation,
+  effacerConversation,
+} from "@/lib/persistance";
 
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
@@ -73,13 +78,20 @@ const PARCOURS = [
 ];
 
 function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Reprise de la conversation en cours : le widget recrée son iframe à
+  // chaque changement de page de la boutique.
+  const [initial] = useState(chargerConversation);
+  const [messages, setMessages] = useState<ChatMessage[]>(initial.messages);
   const [saisie, setSaisie] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [produits, setProduits] = useState<Record<string, ProduitCompact>>({});
-  const [marques, setMarques] = useState<MarqueProposee[]>([]);
-  const [demandePro, setDemandePro] = useState<DemandePro | null>(null);
+  const [produits, setProduits] = useState<Record<string, ProduitCompact>>(
+    initial.produits,
+  );
+  const [marques, setMarques] = useState<MarqueProposee[]>(initial.marques);
+  const [demandePro, setDemandePro] = useState<DemandePro | null>(
+    initial.demandePro,
+  );
   const panier = usePanierHote();
 
   const finRef = useRef<HTMLDivElement>(null);
@@ -92,6 +104,13 @@ function ChatPage() {
     if (!messages.length) return;
     finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, enCours]);
+
+  // On n'enregistre pas pendant le streaming : inutile d'écrire à chaque
+  // fragment reçu, seul l'état stabilisé nous intéresse.
+  useEffect(() => {
+    if (enCours) return;
+    sauvegarderConversation({ messages, produits, marques, demandePro });
+  }, [messages, produits, marques, demandePro, enCours]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -158,6 +177,7 @@ function ChatPage() {
     setDemandePro(null);
     setErreur(null);
     setEnCours(false);
+    effacerConversation();
   }
 
   const vide = messages.length === 0;
@@ -185,7 +205,7 @@ function ChatPage() {
             className="tap-target flex items-center gap-1.5 border-2 border-paper/25 px-2.5 py-1.5 font-display text-[10px] tracking-[0.2em] text-paper transition hover:border-gold hover:text-gold"
           >
             <RotateCcw className="h-3 w-3" />
-            RESET
+            RECOMMENCER
           </button>
         )}
       </header>
@@ -588,11 +608,12 @@ function RecapDemandePro({
   const { envoiPro, envoyerDemandePro } = panier;
 
   const lignes: Array<[string, string]> = [
-    ["Société", demande.societe],
-    ["SIRET", demande.siret],
     ["Contact", demande.nom],
     ["Email", demande.email],
     ["Téléphone", demande.telephone],
+    ["Rappel", demande.rappel ? "Souhaité" : ""],
+    ["Société", demande.societe],
+    ["SIRET", demande.siret],
     ["Activité", demande.activite],
     ["Ville", demande.ville],
   ];
@@ -614,9 +635,9 @@ function RecapDemandePro({
         )}
       </dl>
 
-      {demande.precisions && (
+      {demande.message && (
         <p className="mt-2 border-t border-ink/15 pt-2 text-xs text-ink/70">
-          {demande.precisions}
+          {demande.message}
         </p>
       )}
 

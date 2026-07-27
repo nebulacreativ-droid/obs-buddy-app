@@ -97,12 +97,16 @@ CE QUE TU FAIS
 6. Tu affiches le palier de fidélité d'un client connecté (marqueur [[FIDELITE]]).
 
 DEVENIR CLIENT PRO
-Recueille, UNE question à la fois : raison sociale, SIRET, type d'activité,
-ville, nom du contact, email, téléphone, puis le besoin (volume, marques
-recherchées). Les quatre premiers obligatoires sont : raison sociale, SIRET,
-nom, email — n'appelle preparer_demande_pro qu'une fois ceux-là obtenus.
-Le SIRET fait 14 chiffres ; s'il n'en a pas encore, dis-lui qu'il peut faire
-la demande dès l'immatriculation et propose de garder le reste pour plus tard.
+Reste léger : quatre informations suffisent — nom, email, téléphone, et ce
+que la personne recherche. Demande-les UNE à la fois, puis propose d'être
+rappelé ("Tu veux qu'un conseiller te rappelle ? [[C:Oui, rappelez-moi|Non, par email]]").
+
+Raison sociale, SIRET, activité et ville sont FACULTATIFS : ne les réclame
+jamais, propose-les au plus une fois, et n'insiste pas si la personne passe.
+Beaucoup de projets ne sont pas encore immatriculés — exiger un SIRET
+ferait fuir un futur client.
+
+Appelle preparer_demande_pro dès que tu as les quatre informations de base.
 Tu n'envoies jamais la demande toi-même : l'utilisateur valide le
 récapitulatif affiché par l'interface.
 
@@ -302,26 +306,30 @@ const TOOLS: ChatCompletionTool[] = [
     function: {
       name: "preparer_demande_pro",
       description:
-        "Prépare une demande de compte professionnel une fois TOUTES les informations obligatoires recueillies (raison sociale, SIRET à 14 chiffres, nom du contact, email). L'interface affiche un récapitulatif que l'utilisateur valide lui-même : cet outil n'envoie rien.",
+        "Prépare une demande de contact professionnel. Seuls le nom, l'email, le téléphone et un message sont nécessaires. L'interface affiche un récapitulatif que l'utilisateur valide lui-même : cet outil n'envoie rien.",
       parameters: {
         type: "object",
         properties: {
-          societe: { type: "string", description: "Raison sociale." },
-          siret: { type: "string", description: "SIRET, 14 chiffres." },
           nom: { type: "string", description: "Nom et prénom du contact." },
           email: { type: "string" },
           telephone: { type: "string" },
+          message: {
+            type: "string",
+            description: "Ce que la personne recherche, en clair.",
+          },
+          rappel: {
+            type: "boolean",
+            description: "La personne souhaite être rappelée par téléphone.",
+          },
+          societe: { type: "string", description: "Raison sociale (facultatif)." },
+          siret: { type: "string", description: "SIRET à 14 chiffres (facultatif)." },
           activite: {
             type: "string",
-            description: "Barbershop, salon de coiffure, institut, grossiste…",
+            description: "Barbershop, salon, institut… (facultatif)",
           },
-          ville: { type: "string" },
-          precisions: {
-            type: "string",
-            description: "Besoin exprimé, volume, marques recherchées.",
-          },
+          ville: { type: "string", description: "Facultatif." },
         },
-        required: ["societe", "siret", "nom", "email"],
+        required: ["nom", "email", "telephone", "message"],
         additionalProperties: false,
       },
     },
@@ -451,23 +459,29 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
       String(args[cle] ?? "").trim().slice(0, max);
 
     const demande = {
-      societe: texte("societe"),
-      siret: texte("siret", 40).replace(/\s+/g, ""),
       nom: texte("nom"),
       email: texte("email"),
       telephone: texte("telephone", 40),
+      message: texte("message", 1500),
+      rappel: args.rappel === true ? "oui" : "",
+      societe: texte("societe"),
+      siret: texte("siret", 40).replace(/\s+/g, ""),
       activite: texte("activite"),
       ville: texte("ville"),
-      precisions: texte("precisions", 1500),
     };
 
     // On valide ici ce que la boutique revalidera : autant le dire au modèle
     // tout de suite plutôt que de faire échouer l'envoi après coup.
+    // Société et SIRET restent facultatifs — un projet en cours de création
+    // n'a pas encore d'immatriculation.
     const manques: string[] = [];
-    if (!demande.societe) manques.push("la raison sociale");
-    if (!/^\d{14}$/.test(demande.siret)) manques.push("un SIRET à 14 chiffres");
     if (!demande.nom) manques.push("le nom du contact");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(demande.email)) manques.push("un email valide");
+    if (demande.telephone.replace(/\D/g, "").length < 9) manques.push("un téléphone");
+    if (!demande.message) manques.push("ce qu'il recherche");
+    if (demande.siret && !/^\d{14}$/.test(demande.siret)) {
+      manques.push("un SIRET à 14 chiffres (ou laisse-le de côté)");
+    }
 
     if (manques.length) {
       return {
