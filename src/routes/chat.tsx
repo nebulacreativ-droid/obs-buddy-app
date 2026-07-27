@@ -29,24 +29,24 @@ export const Route = createFileRoute("/chat")({
   }),
 });
 
-const ACCUEIL =
-  "Salut, c'est O'Buddy 👋 Je connais le catalogue O'Barbershop par cœur. Par quoi on commence ?";
+const ACCUEIL = "Salut, c'est O'Buddy 👋 Par quoi on commence ?";
 
-// Les 3 parcours historiques de l'assistant, menés en conversation, plus le SAV.
+// Routine perso et matériel pro sont fusionnés : dans les deux cas il s'agit
+// d'une recommandation produit, le bot distingue ensuite perso ou pro.
 const PARCOURS = [
   {
     numero: "01",
-    eyebrow: "Particulier",
-    titre: "Ma routine perso",
-    desc: "Cheveux, barbe, peau",
-    message: "Je veux me composer une routine perso.",
+    eyebrow: "Déjà client",
+    titre: "Ma commande",
+    desc: "Suivi, livraison, retour",
+    message: "J'ai une question sur ma commande.",
   },
   {
     numero: "02",
-    eyebrow: "Pro barbier",
-    titre: "Mon matériel pro",
-    desc: "Tondeuses, ciseaux, rasoirs",
-    message: "Je cherche du matériel pro pour mon activité de barbier.",
+    eyebrow: "Conseil",
+    titre: "Recommandation produit",
+    desc: "Routine perso ou matériel pro",
+    message: "Je cherche une recommandation produit.",
   },
   {
     numero: "03",
@@ -57,10 +57,10 @@ const PARCOURS = [
   },
   {
     numero: "04",
-    eyebrow: "Déjà client",
-    titre: "Ma commande",
-    desc: "Suivi, livraison, retour",
-    message: "J'ai une question sur ma commande.",
+    eyebrow: "Divers",
+    titre: "Autre question",
+    desc: "Conseil technique, boutique",
+    message: "J'ai une autre question.",
   },
 ];
 
