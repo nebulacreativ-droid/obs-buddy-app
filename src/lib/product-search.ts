@@ -120,6 +120,14 @@ export type MoteurRecherche = ReturnType<typeof creerMoteur>;
 export function creerMoteur(catalogue: Produit[]) {
   const produits = catalogue.filter((p) => !estEchantillon(p));
 
+  // Classement des meilleures ventes, alimenté par la boutique au moment de la
+  // requête. À pertinence comparable, ce qui se vend passe devant.
+  let rangVentes = new Map<string, number>();
+
+  function definirMeilleuresVentes(ids: string[]) {
+    rangVentes = new Map(ids.map((id, rang) => [id, rang]));
+  }
+
   const index = produits.map((p) => ({
     p,
     nom: normalize(p.nom),
@@ -193,6 +201,12 @@ export function creerMoteur(catalogue: Produit[]) {
       if (p.dispo !== "rupture") score += 3;
       if (p.image && !p.image.includes("no-image")) score += 2;
 
+      // Bonus meilleures ventes, dégressif : de +10 pour le tout premier à +2
+      // en fin de classement. Assez fort pour départager, trop faible pour
+      // remonter un produit hors sujet.
+      const rang = rangVentes.get(p.id);
+      if (rang !== undefined) score += Math.max(2, 10 - Math.floor(rang / 4));
+
       notes.push({ p, score });
     }
 
@@ -231,5 +245,5 @@ export function creerMoteur(catalogue: Produit[]) {
     };
   }
 
-  return { produits, rechercher, parId, taxonomie };
+  return { produits, rechercher, parId, taxonomie, definirMeilleuresVentes };
 }

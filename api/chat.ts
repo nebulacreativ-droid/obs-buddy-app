@@ -353,6 +353,12 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
   }
 
   if (nom === "rechercher_produits") {
+    // Les ventes réelles pondèrent le classement : à pertinence comparable,
+    // ce qui part le mieux en boutique remonte. Le résultat est mis en cache
+    // 30 min côté client PrestaShop, l'appel est donc quasi gratuit.
+    const ventes = await idsMeilleuresVentes(60);
+    if (ventes) moteur.definirMeilleuresVentes(ventes);
+
     const produits = moteur.rechercher(args as SearchParams);
     return {
       pourLeModele: {
