@@ -1,27 +1,8 @@
 import produits from "@/data/produits.json";
 import marques from "@/data/marques.json";
+import { estEchantillon, type Produit } from "@/lib/product-search";
 
-export type Produit = {
-  id: string;
-  ref: string;
-  nom: string;
-  marque: string;
-  id_marque: string;
-  pays: string;
-  segment: "entree" | "milieu" | "premium" | string;
-  categorie: string;
-  super_cat: string;
-  type: string;
-  prix: number;
-  prix_aff: string;
-  stock: number;
-  dispo: string;
-  image: string;
-  lien: string;
-  recap: string;
-  styles: string[];
-  mif: boolean;
-};
+export type { Produit };
 
 export type Marque = {
   id: string;
@@ -36,11 +17,9 @@ export type Marque = {
   lien: string;
 };
 
-// Exclut les échantillons / samples des recommandations (tailles 10g, mini formats…).
-// Détection par nom : "Echantillon X" ou "X Sample" — robuste aux variations de casse.
-const isSample = (p: Produit) => /^\s*echantillon\b|\bsample\b/i.test(p.nom);
-
-export const PRODUITS = (produits as Produit[]).filter((p) => !isSample(p));
+// L'exclusion des échantillons vit dans product-search : une seule définition
+// partagée entre l'assistant, le chatbot et la fonction serverless.
+export const PRODUITS = (produits as Produit[]).filter((p) => !estEchantillon(p));
 export const MARQUES = marques as Marque[];
 
 export const produitsByType = (types: string[]) =>

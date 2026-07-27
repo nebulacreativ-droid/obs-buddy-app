@@ -3,18 +3,22 @@
 // Runtime Node.js (pas Edge) : produits.json pèse 1.2 Mo, au-delà de la limite Edge.
 // Pas d'en-têtes CORS : l'API n'est appelable que depuis obs-obuddy.vercel.app,
 // ce qui empêche un tiers de consommer les crédits OpenAI du compte.
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import OpenAI from "openai";
 import type {
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions";
+// Extensions .js obligatoires : Vercel compile ces fonctions en ESM Node.
 import {
-  searchProducts,
-  getTaxonomy,
+  creerMoteur,
+  type Produit,
   type SearchParams,
-} from "../src/lib/product-search";
-import { chercherInfo, SITE_URL } from "../src/lib/knowledge-base";
+} from "../src/lib/product-search.js";
+import { chercherInfo, SITE_URL } from "../src/lib/knowledge-base.js";
 
 const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const MAX_MESSAGES = 30;
@@ -22,7 +26,16 @@ const MAX_CHARS = 2000;
 const MAX_TOOL_STEPS = 4;
 const MAX_TOKENS = 700;
 
-const TAXONOMIE = getTaxonomy();
+// Catalogue lu sur disque plutôt qu'importé : Node ESM refuse un import JSON
+// sans attribut. Le fichier est embarqué via "includeFiles" dans vercel.json.
+// Chemin résolu depuis ce module, pas depuis process.cwd() qui varie.
+const ICI = dirname(fileURLToPath(import.meta.url));
+const CATALOGUE: Produit[] = JSON.parse(
+  readFileSync(join(ICI, "..", "src", "data", "produits.json"), "utf8"),
+);
+
+const moteur = creerMoteur(CATALOGUE);
+const TAXONOMIE = moteur.taxonomie();
 
 const SYSTEM_PROMPT = `Tu es O'Buddy, l'assistant barber d'O'Barbershop (${SITE_URL}).
 
@@ -132,7 +145,7 @@ const TOOLS: ChatCompletionTool[] = [
 
 function executerOutil(nom: string, args: Record<string, unknown>) {
   if (nom === "rechercher_produits") {
-    const produits = searchProducts(args as SearchParams);
+    const produits = moteur.rechercher(args as SearchParams);
     return {
       pourLeModele: {
         nombre: produits.length,
