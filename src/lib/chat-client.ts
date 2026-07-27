@@ -89,33 +89,53 @@ export async function streamChat(
   }
 }
 
-const MARQUEUR_PRODUIT = /\[\[P:([^\]]+)\]\]/g;
+// [[P:id]] = carte produit · [[C:a|b|c]] = propositions de réponse cliquables
+const MARQUEURS = /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]/g;
 
 export type SegmentMessage =
   | { type: "texte"; valeur: string }
   | { type: "produit"; id: string };
 
+export type MessageDecoupe = {
+  segments: SegmentMessage[];
+  /** Réponses proposées, à afficher en boutons sous la bulle. */
+  choix: string[];
+};
+
 /**
- * Découpe un message en segments texte / cartes produit.
- * Le modèle cite un produit avec le marqueur [[P:id]].
+ * Sépare le corps du message (texte + cartes produit) des propositions de
+ * réponse. Les choix sont sortis du flux : ils se rendent en boutons, pas
+ * en ligne dans la phrase.
  */
-export function decouperMessage(texte: string): SegmentMessage[] {
+export function decouperMessage(texte: string): MessageDecoupe {
   const segments: SegmentMessage[] = [];
+  const choix: string[] = [];
   let curseur = 0;
 
-  for (const match of texte.matchAll(MARQUEUR_PRODUIT)) {
+  for (const match of texte.matchAll(MARQUEURS)) {
     const debut = match.index ?? 0;
     if (debut > curseur) {
       segments.push({ type: "texte", valeur: texte.slice(curseur, debut) });
     }
-    segments.push({ type: "produit", id: match[1].trim() });
+
+    if (match[1] !== undefined) {
+      segments.push({ type: "produit", id: match[1].trim() });
+    } else if (match[2] !== undefined) {
+      for (const option of match[2].split("|")) {
+        const propre = option.trim();
+        // 40 caractères : au-delà ce n'est plus un choix rapide mais une phrase.
+        if (propre && propre.length <= 40 && !choix.includes(propre)) {
+          choix.push(propre);
+        }
+      }
+    }
     curseur = debut + match[0].length;
   }
 
   if (curseur < texte.length) {
     segments.push({ type: "texte", valeur: texte.slice(curseur) });
   }
-  return segments;
+  return { segments, choix: choix.slice(0, 5) };
 }
 
 export type FragmentTexte =

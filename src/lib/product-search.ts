@@ -54,6 +54,9 @@ export type ProduitCompact = {
   lien: string;
   image: string;
   argument: string;
+  /** Le produit a plusieurs variantes (taille, parfum, gamme) : l'ajout direct
+   *  au panier mettrait un article au hasard, il faut passer par la fiche. */
+  declinaisons: boolean;
 };
 
 export type Taxonomie = {
@@ -82,6 +85,10 @@ export const estEchantillon = (p: Produit) =>
 
 const uniq = (arr: string[]) => [...new Set(arr)].filter(Boolean).sort();
 
+/** Un prix affiché sous forme de plage ("9,00 - 25,00") signale un produit
+ *  décliné : l'export PrestaShop rend l'intervalle des variantes. */
+const aDesDeclinaisons = (p: Produit) => /\s-\s/.test(p.prix_aff);
+
 function toCompact(p: Produit): ProduitCompact {
   return {
     id: p.id,
@@ -95,6 +102,7 @@ function toCompact(p: Produit): ProduitCompact {
     lien: p.lien,
     image: p.image,
     argument: p.recap ? p.recap.slice(0, 220) : "",
+    declinaisons: aDesDeclinaisons(p),
   };
 }
 

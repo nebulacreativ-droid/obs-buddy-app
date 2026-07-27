@@ -1,12 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUp, ExternalLink, RotateCcw } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUp,
+  Check,
+  ExternalLink,
+  RotateCcw,
+  ShoppingBag,
+} from "lucide-react";
 import {
   streamChat,
   decouperMessage,
   formaterTexte,
   type ChatMessage,
 } from "@/lib/chat-client";
+import { usePanierHote } from "@/lib/panier-hote";
 import type { ProduitCompact } from "@/lib/product-search";
 
 export const Route = createFileRoute("/chat")({
@@ -50,6 +58,7 @@ function ChatPage() {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [produits, setProduits] = useState<Record<string, ProduitCompact>>({});
+  const panier = usePanierHote();
 
   const finRef = useRef<HTMLDivElement>(null);
   const champRef = useRef<HTMLTextAreaElement>(null);
@@ -198,7 +207,13 @@ function ChatPage() {
             }
             return (
               <Bulle key={i} role="assistant">
-                <ContenuAssistant texte={m.content} produits={produits} />
+                <ContenuAssistant
+                  texte={m.content}
+                  produits={produits}
+                  panier={panier}
+                  actif={dernier && !enCours}
+                  onChoix={envoyer}
+                />
               </Bulle>
             );
           })}
@@ -273,11 +288,17 @@ function Bulle({
 function ContenuAssistant({
   texte,
   produits,
+  panier,
+  actif,
+  onChoix,
 }: {
   texte: string;
   produits: Record<string, ProduitCompact>;
+  panier: ReturnType<typeof usePanierHote>;
+  actif: boolean;
+  onChoix: (valeur: string) => void;
 }) {
-  const segments = decouperMessage(texte);
+  const { segments, choix } = decouperMessage(texte);
   return (
     <div className="flex flex-col gap-2">
       {segments.map((s, i) => {
@@ -293,8 +314,22 @@ function ContenuAssistant({
         const produit = produits[s.id];
         // Le marqueur est ignoré si le produit n'a pas été remonté par la recherche.
         if (!produit) return null;
-        return <CarteProduit key={i} produit={produit} />;
+        return <CarteProduit key={i} produit={produit} panier={panier} />;
       })}
+
+      {actif && choix.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {choix.map((c) => (
+            <button
+              key={c}
+              onClick={() => onChoix(c)}
+              className="tap-target rounded-full border border-foreground/25 bg-background px-3 py-1.5 text-xs transition hover:border-foreground hover:bg-foreground hover:text-background"
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -322,42 +357,93 @@ function TexteFormate({ valeur }: { valeur: string }) {
   );
 }
 
-function CarteProduit({ produit }: { produit: ProduitCompact }) {
+function CarteProduit({
+  produit,
+  panier,
+}: {
+  produit: ProduitCompact;
+  panier: ReturnType<typeof usePanierHote>;
+}) {
+  const etat = panier.etats[produit.id];
+  const enRupture = produit.dispo === "rupture";
+
+  // L'ajout direct n'est proposé que si la boutique héberge le chat, que le
+  // produit est dispo, et qu'il n'a pas de variantes à choisir.
+  const ajoutPossible =
+    panier.disponible && !enRupture && !produit.declinaisons;
+
   return (
-    <a
-      href={produit.lien}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="tap-target group flex gap-3 rounded-sm border border-border bg-background p-2.5 transition hover:border-foreground/40 hover:-translate-y-0.5"
-    >
-      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-sm bg-muted">
-        {produit.image && (
-          <img
-            src={produit.image}
-            alt={produit.nom}
-            loading="lazy"
-            className="h-full w-full object-contain p-0.5"
-          />
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          {produit.marque}
-        </div>
-        <div className="truncate text-sm font-medium leading-tight">
-          {produit.nom}
-        </div>
-        <div className="mt-1 flex items-center gap-2">
-          <span className="font-display text-base">{produit.prix_aff} €</span>
-          {produit.dispo === "rupture" && (
-            <span className="text-[10px] uppercase tracking-widest text-destructive">
-              Rupture
-            </span>
+    <div className="rounded-sm border border-border bg-background p-2.5">
+      <a
+        href={produit.lien}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="tap-target group flex gap-3"
+      >
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-sm bg-muted">
+          {produit.image && (
+            <img
+              src={produit.image}
+              alt={produit.nom}
+              loading="lazy"
+              className="h-full w-full object-contain p-0.5"
+            />
           )}
         </div>
-      </div>
-      <ExternalLink className="h-3.5 w-3.5 shrink-0 self-center text-muted-foreground transition group-hover:text-foreground" />
-    </a>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            {produit.marque}
+          </div>
+          <div className="text-sm font-medium leading-tight">{produit.nom}</div>
+          <div className="mt-1 flex items-center gap-2">
+            <span className="font-display text-base">{produit.prix_aff} €</span>
+            {enRupture && (
+              <span className="text-[10px] uppercase tracking-widest text-destructive">
+                Rupture
+              </span>
+            )}
+          </div>
+        </div>
+        <ExternalLink className="h-3.5 w-3.5 shrink-0 self-center text-muted-foreground transition group-hover:text-foreground" />
+      </a>
+
+      {ajoutPossible && (
+        <button
+          onClick={() => panier.ajouter(produit.id)}
+          disabled={etat === "envoi" || etat === "ok"}
+          className={`tap-target mt-2 flex w-full items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-xs font-medium uppercase tracking-widest transition ${
+            etat === "ok"
+              ? "bg-foreground/10 text-foreground"
+              : "bg-gold text-ink hover:brightness-105"
+          } disabled:cursor-default`}
+        >
+          {etat === "ok" ? (
+            <>
+              <Check className="h-3.5 w-3.5" /> Ajouté au panier
+            </>
+          ) : etat === "envoi" ? (
+            "Ajout…"
+          ) : (
+            <>
+              <ShoppingBag className="h-3.5 w-3.5" /> Ajouter au panier
+            </>
+          )}
+        </button>
+      )}
+
+      {etat === "erreur" && (
+        <p className="mt-1.5 text-[11px] text-destructive">
+          {panier.messages[produit.id] ??
+            "Ajout impossible. Ouvre la fiche produit pour commander."}
+        </p>
+      )}
+
+      {panier.disponible && produit.declinaisons && !enRupture && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground">
+          Plusieurs versions — choisis la tienne sur la fiche produit.
+        </p>
+      )}
+    </div>
   );
 }
 

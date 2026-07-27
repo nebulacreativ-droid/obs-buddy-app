@@ -133,6 +133,114 @@
     monter();
   }
 
+  // ── Pont panier ────────────────────────────────────────────────────────
+  // Le chat vit dans une iframe sur un autre domaine : il n'a ni la session
+  // client ni les cookies du panier. Il demande, c'est ce script — qui tourne
+  // sur la boutique — qui exécute l'ajout.
+
+  function boutique() {
+    return typeof window.prestashop === "object" ? window.prestashop : null;
+  }
+
+  /** Le panier n'est pilotable que si PrestaShop expose son jeton et son URL. */
+  function panierDisponible() {
+    var ps = boutique();
+    return !!(ps && ps.static_token && ps.urls && ps.urls.pages && ps.urls.pages.cart);
+  }
+
+  function repondre(message) {
+    var iframe = panneau.querySelector("iframe");
+    if (iframe && iframe.contentWindow) {
+      iframe.contentWindow.postMessage(message, ORIGINE);
+    }
+  }
+
+  function ajouterAuPanier(idProduit) {
+    var ps = boutique();
+
+    var corps = new URLSearchParams({
+      controller: "cart",
+      add: "1",
+      action: "update",
+      ajax: "1",
+      id_product: String(idProduit),
+      qty: "1",
+      token: ps.static_token,
+    });
+
+    fetch(ps.urls.pages.cart, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: corps.toString(),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        var erreurs = data && data.errors;
+        var enEchec =
+          (data && data.hasError) ||
+          (Array.isArray(erreurs) ? erreurs.length > 0 : !!erreurs);
+
+        if (enEchec) {
+          repondre({
+            source: "obsbuddy-hote",
+            type: "resultat-panier",
+            id: idProduit,
+            ok: false,
+            message: Array.isArray(erreurs) ? erreurs[0] : String(erreurs),
+          });
+          return;
+        }
+
+        // Rafraîchit le compteur de panier du thème.
+        if (ps.emit) ps.emit("updateCart", { reason: { linkAction: "add-to-cart" }, resp: data });
+
+        repondre({
+          source: "obsbuddy-hote",
+          type: "resultat-panier",
+          id: idProduit,
+          ok: true,
+        });
+      })
+      .catch(function () {
+        repondre({
+          source: "obsbuddy-hote",
+          type: "resultat-panier",
+          id: idProduit,
+          ok: false,
+          message: "Ajout impossible pour le moment.",
+        });
+      });
+  }
+
+  window.addEventListener("message", function (e) {
+    // Seule l'iframe du chat, sur son origine connue, peut piloter ce pont.
+    if (e.origin !== ORIGINE) return;
+    var iframe = panneau.querySelector("iframe");
+    if (!iframe || e.source !== iframe.contentWindow) return;
+
+    var d = e.data;
+    if (!d || d.source !== "obsbuddy-chat") return;
+
+    if (d.type === "pret") {
+      repondre({
+        source: "obsbuddy-hote",
+        type: "bonjour",
+        panierDisponible: panierDisponible(),
+      });
+      return;
+    }
+
+    if (d.type === "ajouter-panier" && d.id && panierDisponible()) {
+      ajouterAuPanier(d.id);
+    }
+  });
+
   // API minimale pour piloter le widget depuis la boutique
   // (ex: un bouton "Demander à O'Buddy" sur une fiche produit).
   window.OBuddy = {
