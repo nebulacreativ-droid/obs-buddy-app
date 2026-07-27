@@ -77,7 +77,10 @@ function ChatPage() {
   const champRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Ne défile qu'une fois la conversation entamée : au chargement, cela
+  // masquerait le message d'accueil et les tuiles de parcours.
   useEffect(() => {
+    if (!messages.length) return;
     finRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, enCours]);
 
