@@ -19,11 +19,17 @@ import {
   type SearchParams,
 } from "../src/lib/product-search.js";
 import { chercherInfo, SITE_URL } from "../src/lib/knowledge-base.js";
+import {
+  suivreCommande,
+  idsNouveautes,
+  idsMeilleuresVentes,
+  apiConfiguree,
+} from "../src/lib/prestashop.js";
 
-// gpt-4.1-mini plutôt que gpt-4o-mini : nettement plus fidèle aux consignes
-// (une seule question par message, marqueurs [[C:…]]), pour un coût qui reste
-// négligeable. Surchargeable par la variable d'environnement OPENAI_MODEL.
-const MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+// gpt-4.1 complet : meilleure tenue du rôle, du parcours et des marqueurs.
+// ~5× le prix de la version mini, soit de l'ordre de 0,008 $ par échange.
+// Repasser en mini se fait sans redéploiement via la variable OPENAI_MODEL.
+const MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
 const MAX_MESSAGES = 30;
 const MAX_CHARS = 2000;
 const MAX_TOOL_STEPS = 4;
@@ -73,6 +79,15 @@ CE QUE TU FAIS
 1. Tu recommandes des produits du catalogue O'Barbershop.
 2. Tu réponds aux questions sur la boutique (livraison, compte pro…).
 3. Tu donnes du conseil technique barbier (entretien du matos, gestes, routines).
+4. Tu montres les nouveautés et les meilleures ventes (outil produits_en_avant).
+5. Tu renseignes sur le statut d'une commande (outil suivi_commande).
+
+SUIVI DE COMMANDE — RÈGLE DE CONFIDENTIALITÉ
+Tu ne consultes JAMAIS une commande sans avoir à la fois sa référence ET
+l'email du compte. S'il ne t'a donné qu'un des deux, demande l'autre, une
+question à la fois. N'invente jamais un statut ni une date de livraison.
+Si rien ne correspond, ne dis pas lequel des deux éléments est faux : tu ne
+sais pas à qui tu parles, et le dire renseignerait un curieux.
 
 RÈGLES ABSOLUES
 - Pour recommander un produit, tu DOIS d'abord appeler rechercher_produits.
@@ -183,6 +198,54 @@ const TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "produits_en_avant",
+      description:
+        "Renvoie les nouveautés de la boutique ou ses meilleures ventes du moment. À utiliser quand on demande ce qui est nouveau, ce qui marche le mieux, ce qui est populaire, ou pour illustrer une tendance.",
+      parameters: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["nouveautes", "meilleures_ventes"],
+          },
+          super_cat: {
+            type: "array",
+            items: { type: "string", enum: TAXONOMIE.super_cat },
+            description: "Restreint à une famille de produits (facultatif).",
+          },
+          limite: { type: "number", description: "Nombre de résultats (défaut 6)." },
+        },
+        required: ["type"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "suivi_commande",
+      description:
+        "Donne le statut d'une commande. Exige IMPÉRATIVEMENT la référence de commande ET l'email utilisé lors de l'achat. N'appelle cet outil que lorsque tu as les deux : sans quoi, demande d'abord ce qui manque.",
+      parameters: {
+        type: "object",
+        properties: {
+          reference: {
+            type: "string",
+            description: "Référence de la commande (ex: XKBKNABJK).",
+          },
+          email: {
+            type: "string",
+            description: "Email du compte ayant passé la commande.",
+          },
+        },
+        required: ["reference", "email"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "infos_boutique",
       description:
         "Renvoie les infos officielles de la boutique (livraison, compte pro, retours, contact…). À appeler pour toute question sur le fonctionnement de la boutique.",
@@ -201,7 +264,94 @@ const TOOLS: ChatCompletionTool[] = [
   },
 ];
 
-function executerOutil(nom: string, args: Record<string, unknown>) {
+async function executerOutil(nom: string, args: Record<string, unknown>) {
+  if (nom === "produits_en_avant") {
+    const type = String(args.type ?? "");
+    const limite = Math.min(Number(args.limite) || 6, 10);
+    const familles = Array.isArray(args.super_cat) ? (args.super_cat as string[]) : [];
+
+    const ids =
+      type === "meilleures_ventes"
+        ? await idsMeilleuresVentes(40)
+        : await idsNouveautes(40);
+
+    if (!ids) {
+      return {
+        pourLeModele: {
+          disponible: false,
+          consigne: apiConfiguree()
+            ? "La boutique ne répond pas pour l'instant. Dis-le simplement et propose de chercher autrement."
+            : "Cette information n'est pas accessible. Propose de chercher par type de produit à la place.",
+        },
+        pourLInterface: null,
+      };
+    }
+
+    // Les identifiants viennent de la boutique, les fiches du catalogue local :
+    // on garde un affichage homogène et on écarte ce qui n'est plus vendable.
+    const produits = ids
+      .map((id) => moteur.parId(id))
+      .filter((p): p is NonNullable<typeof p> => !!p && p.dispo !== "rupture")
+      .filter((p) => !familles.length || familles.includes(p.super_cat))
+      .slice(0, limite);
+
+    return {
+      pourLeModele: {
+        disponible: true,
+        type,
+        nombre: produits.length,
+        produits: produits.map((p) => ({
+          id: p.id,
+          nom: p.nom,
+          marque: p.marque,
+          prix: p.prix_aff,
+          categorie: p.categorie,
+        })),
+      },
+      pourLInterface: produits,
+    };
+  }
+
+  if (nom === "suivi_commande") {
+    const reference = String(args.reference ?? "");
+    const email = String(args.email ?? "");
+
+    if (!reference.trim() || !email.trim()) {
+      return {
+        pourLeModele: {
+          consigne:
+            "Il manque la référence ou l'email. Demande l'information manquante, sans jamais deviner.",
+        },
+        pourLInterface: null,
+      };
+    }
+
+    const suivi = await suivreCommande(reference, email);
+
+    if (suivi.etat === "indisponible") {
+      return {
+        pourLeModele: {
+          consigne:
+            "Le suivi des commandes est momentanément inaccessible. Invite à contacter le service client.",
+        },
+        pourLInterface: null,
+      };
+    }
+
+    if (suivi.etat === "introuvable") {
+      return {
+        pourLeModele: {
+          trouvee: false,
+          consigne:
+            "Aucune commande ne correspond à ce couple référence + email. Dis-le sans préciser lequel des deux est en cause, et invite à vérifier les deux ou à contacter le service client.",
+        },
+        pourLInterface: null,
+      };
+    }
+
+    return { pourLeModele: { trouvee: true, ...suivi }, pourLInterface: null };
+  }
+
   if (nom === "rechercher_produits") {
     const produits = moteur.rechercher(args as SearchParams);
     return {
@@ -365,7 +515,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           args = {};
         }
 
-        const resultat = executerOutil(appel.nom, args);
+        const resultat = await executerOutil(appel.nom, args);
 
         if (resultat.pourLInterface?.length) {
           envoyer({ t: "produits", d: resultat.pourLInterface });

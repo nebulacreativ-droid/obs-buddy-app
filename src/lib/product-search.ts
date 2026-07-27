@@ -49,6 +49,7 @@ export type ProduitCompact = {
   prix: number;
   prix_aff: string;
   categorie: string;
+  super_cat: string;
   segment: string;
   dispo: string;
   lien: string;
@@ -97,6 +98,7 @@ function toCompact(p: Produit): ProduitCompact {
     prix: p.prix,
     prix_aff: p.prix_aff,
     categorie: p.categorie,
+    super_cat: p.super_cat,
     segment: p.segment,
     dispo: p.dispo,
     lien: p.lien,
