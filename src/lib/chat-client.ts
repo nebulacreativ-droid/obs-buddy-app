@@ -1,17 +1,20 @@
 // Client SSE pour /api/chat. Isolé de l'UI pour rester testable.
 import type { ProduitCompact } from "./product-search";
+import type { MarqueProposee } from "./marques-search";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export type EvenementChat =
   | { t: "text"; d: string }
   | { t: "produits"; d: ProduitCompact[] }
+  | { t: "marques"; d: MarqueProposee[] }
   | { t: "done" }
   | { t: "error"; m: string };
 
 export type CallbacksChat = {
   onTexte: (fragment: string) => void;
   onProduits: (produits: ProduitCompact[]) => void;
+  onMarques: (marques: MarqueProposee[]) => void;
   onErreur: (message: string) => void;
 };
 
@@ -79,6 +82,7 @@ export async function streamChat(
 
         if (evenement.t === "text") callbacks.onTexte(evenement.d);
         else if (evenement.t === "produits") callbacks.onProduits(evenement.d);
+        else if (evenement.t === "marques") callbacks.onMarques(evenement.d);
         else if (evenement.t === "error") callbacks.onErreur(evenement.m);
       }
     }
@@ -89,12 +93,16 @@ export async function streamChat(
   }
 }
 
-// [[P:id]] = carte produit · [[C:a|b|c]] = propositions de réponse cliquables
-const MARQUEURS = /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]/g;
+// [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables
+// [[MARQUES]] sélecteur de marques · [[RDV]] prise de rendez-vous
+const MARQUEURS =
+  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV)\]\]/g;
 
 export type SegmentMessage =
   | { type: "texte"; valeur: string }
-  | { type: "produit"; id: string };
+  | { type: "produit"; id: string }
+  | { type: "marques" }
+  | { type: "rdv" };
 
 export type MessageDecoupe = {
   segments: SegmentMessage[];
@@ -120,6 +128,8 @@ export function decouperMessage(texte: string): MessageDecoupe {
 
     if (match[1] !== undefined) {
       segments.push({ type: "produit", id: match[1].trim() });
+    } else if (match[3] !== undefined) {
+      segments.push({ type: match[3] === "RDV" ? "rdv" : "marques" });
     } else if (match[2] !== undefined) {
       for (const option of match[2].split("|")) {
         const propre = option.trim();

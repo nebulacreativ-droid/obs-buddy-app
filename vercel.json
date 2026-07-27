@@ -5,7 +5,7 @@
   "functions": {
     "api/chat.ts": {
       "maxDuration": 30,
-      "includeFiles": "src/data/produits.json"
+      "includeFiles": "src/data/**"
     }
   },
   "rewrites": [

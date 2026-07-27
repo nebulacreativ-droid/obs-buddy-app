@@ -25,6 +25,11 @@ import {
   idsMeilleuresVentes,
   apiConfiguree,
 } from "../src/lib/prestashop.js";
+import {
+  creerCatalogueMarques,
+  type Marque,
+  type FicheCartographie,
+} from "../src/lib/marques-search.js";
 
 // gpt-4.1 complet : meilleure tenue du rôle, du parcours et des marqueurs.
 // ~5× le prix de la version mini, soit de l'ordre de 0,008 $ par échange.
@@ -43,8 +48,16 @@ const CATALOGUE: Produit[] = JSON.parse(
   readFileSync(join(ICI, "..", "src", "data", "produits.json"), "utf8"),
 );
 
+const lireJson = <T,>(...segments: string[]): T =>
+  JSON.parse(readFileSync(join(ICI, "..", "src", "data", ...segments), "utf8"));
+
 const moteur = creerMoteur(CATALOGUE);
 const TAXONOMIE = moteur.taxonomie();
+
+const catalogueMarques = creerCatalogueMarques(
+  lireJson<Marque[]>("marques.json"),
+  lireJson<FicheCartographie[]>("brands-cartographie.json"),
+);
 
 const SYSTEM_PROMPT = `Tu es O'Buddy, l'assistant barber d'O'Barbershop (${SITE_URL}).
 
@@ -141,8 +154,15 @@ citée en premier ci-dessous), et garde le reste pour les tours suivants.
 3. J'OUVRE MON BARBERSHOP
    À cerner : ambiance voulue, nombre de postes de coupe, clientèle cible,
    positionnement prix. Couvre ensuite matériel, mobilier et mur de revente.
-   Sur un projet d'ouverture, propose en fin d'échange d'être rappelé par un
-   conseiller O'Barbershop — c'est un projet qui mérite un vrai accompagnement.
+
+   Le mur de revente est un moment clé : une fois le style et le positionnement
+   connus, appelle proposer_marques et termine ton message par [[MARQUES]].
+   L'utilisateur coche les marques qu'il veut en rayon, et tu enchaînes sur les
+   produits de ces marques.
+
+   Termine toujours un projet d'ouverture en proposant un rendez-vous avec un
+   conseiller O'Barbershop : écris une phrase d'invitation puis le marqueur
+   [[RDV]], qui affiche le module de prise de rendez-vous.
 
 CATALOGUE — valeurs de filtres autorisées (n'en invente aucune autre)
 super_cat : ${TAXONOMIE.super_cat.join(", ")}
@@ -216,6 +236,36 @@ const TOOLS: ChatCompletionTool[] = [
           limite: { type: "number", description: "Nombre de résultats (défaut 6)." },
         },
         required: ["type"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "proposer_marques",
+      description:
+        "Propose des marques à mettre en rayon pour un barbershop en création. À utiliser dans le parcours ouverture de shop, une fois le style et le positionnement connus. L'interface affiche une sélection multiple : l'utilisateur coche celles qu'il retient.",
+      parameters: {
+        type: "object",
+        properties: {
+          styles: {
+            type: "array",
+            items: { type: "string", enum: TAXONOMIE.styles },
+            description: "Styles du shop, pour aligner les marques.",
+          },
+          segment: {
+            type: "array",
+            items: { type: "string", enum: TAXONOMIE.segment },
+            description: "Positionnement prix visé.",
+          },
+          seulementBestSellers: {
+            type: "boolean",
+            description: "Ne garder que les marques qui se vendent le mieux.",
+          },
+          madeInFrance: { type: "boolean" },
+          limite: { type: "number", description: "Nombre de marques (défaut 12)." },
+        },
         additionalProperties: false,
       },
     },
@@ -309,6 +359,34 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
         })),
       },
       pourLInterface: produits,
+    };
+  }
+
+  if (nom === "proposer_marques") {
+    const marques = catalogueMarques.proposer({
+      styles: Array.isArray(args.styles) ? (args.styles as string[]) : undefined,
+      segment: Array.isArray(args.segment) ? (args.segment as string[]) : undefined,
+      seulementBestSellers: args.seulementBestSellers === true,
+      madeInFrance: args.madeInFrance === true,
+      limite: Number(args.limite) || 12,
+    });
+
+    return {
+      pourLeModele: {
+        nombre: marques.length,
+        consigne:
+          "Présente-les en une phrase, puis termine ton message par le marqueur [[MARQUES]] " +
+          "pour que l'utilisateur puisse cocher celles qu'il retient. Ne liste pas les marques " +
+          "une par une dans le texte.",
+        marques: marques.map((m) => ({
+          nom: m.nom,
+          pays: m.pays,
+          segment: m.segment,
+          bestSeller: m.bestSeller,
+        })),
+      },
+      pourLInterface: null,
+      marques,
     };
   }
 
@@ -525,6 +603,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (resultat.pourLInterface?.length) {
           envoyer({ t: "produits", d: resultat.pourLInterface });
+        }
+
+        // Les marques ne transitent que vers l'interface : le modèle n'en reçoit
+        // qu'un résumé, c'est l'utilisateur qui coche dans le sélecteur.
+        const extra = resultat as { marques?: unknown[] };
+        if (extra.marques?.length) {
+          envoyer({ t: "marques", d: extra.marques });
         }
 
         messages.push({
