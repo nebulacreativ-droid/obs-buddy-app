@@ -371,6 +371,9 @@ function ContenuAssistant({
         if (s.type === "rdv") {
           return <BlocRendezVous key={i} />;
         }
+        if (s.type === "fidelite") {
+          return <BlocFidelite key={i} panier={panier} />;
+        }
         const produit = produits[s.id];
         // Le marqueur est ignoré si le produit n'a pas été remonté par la recherche.
         if (!produit) return null;
@@ -478,6 +481,72 @@ function SelecteurMarques({
         >
           VALIDER {choisies.length > 0 && `(${choisies.length})`}
         </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Palier de fidélité. La donnée est demandée à la boutique par le widget, avec
+ * la session du client : elle ne passe jamais par le serveur de l'assistant,
+ * et un visiteur non connecté ne peut rien consulter.
+ */
+function BlocFidelite({ panier }: { panier: ReturnType<typeof usePanierHote> }) {
+  const { fidelite, demanderFidelite } = panier;
+
+  useEffect(() => {
+    if (fidelite.etat === "inconnu") demanderFidelite();
+  }, [fidelite.etat, demanderFidelite]);
+
+  return (
+    <div className="border-2 border-ink bg-paper p-3">
+      <div className="mb-1.5 font-display text-[10px] tracking-[0.3em] text-ink/60">
+        FIDÉLITÉ
+      </div>
+
+      {(fidelite.etat === "inconnu" || fidelite.etat === "chargement") && (
+        <Frappe />
+      )}
+
+      {fidelite.etat === "connecte" && (
+        <>
+          {fidelite.paliers.length ? (
+            <>
+              <div className="text-xs text-ink/60">
+                {fidelite.prenom ? `${fidelite.prenom}, ton palier` : "Ton palier"}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {fidelite.paliers.map((p) => (
+                  <span
+                    key={p}
+                    className="bg-gold px-2 py-0.5 font-display text-sm tracking-wide text-ink"
+                  >
+                    {p.toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm leading-relaxed">
+              Tu es bien connecté, mais aucun palier de fidélité n'est encore
+              associé à ton compte.
+            </p>
+          )}
+        </>
+      )}
+
+      {fidelite.etat === "deconnecte" && (
+        <p className="text-sm leading-relaxed">
+          Connecte-toi sur obarbershop.com pour voir ton palier — je ne peux pas
+          y accéder autrement, c'est ce qui protège ton compte.
+        </p>
+      )}
+
+      {fidelite.etat === "indisponible" && (
+        <p className="text-sm leading-relaxed">
+          Je n'arrive pas à récupérer ton palier depuis ici. Tu le retrouves dans
+          ton compte sur obarbershop.com.
+        </p>
       )}
     </div>
   );

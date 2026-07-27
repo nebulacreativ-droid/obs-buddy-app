@@ -17,10 +17,18 @@ export type EtatAjout = "envoi" | "ok" | "erreur";
 const SOURCE_CHAT = "obsbuddy-chat";
 const SOURCE_HOTE = "obsbuddy-hote";
 
+export type Fidelite =
+  | { etat: "inconnu" }
+  | { etat: "chargement" }
+  | { etat: "deconnecte" }
+  | { etat: "indisponible" }
+  | { etat: "connecte"; prenom: string; paliers: string[] };
+
 export function usePanierHote() {
   const [disponible, setDisponible] = useState(false);
   const [etats, setEtats] = useState<Record<string, EtatAjout>>({});
   const [messages, setMessages] = useState<Record<string, string>>({});
+  const [fidelite, setFidelite] = useState<Fidelite>({ etat: "inconnu" });
 
   // Origine de la boutique, apprise lors de la poignée de main. On ne poste
   // jamais vers "*" une fois qu'elle est connue.
@@ -46,6 +54,18 @@ export function usePanierHote() {
         if (typeof d.message === "string") {
           setMessages((prec) => ({ ...prec, [d.id]: d.message }));
         }
+        return;
+      }
+
+      if (d.type === "resultat-fidelite") {
+        if (d.indisponible) setFidelite({ etat: "indisponible" });
+        else if (!d.connecte) setFidelite({ etat: "deconnecte" });
+        else
+          setFidelite({
+            etat: "connecte",
+            prenom: typeof d.prenom === "string" ? d.prenom : "",
+            paliers: Array.isArray(d.paliers) ? d.paliers : [],
+          });
       }
     };
 
@@ -74,5 +94,22 @@ export function usePanierHote() {
     [disponible],
   );
 
-  return { disponible, etats, messages, ajouter };
+  /** Interroge la boutique sur le palier du client connecté. */
+  const demanderFidelite = useCallback(() => {
+    if (typeof window === "undefined" || window.parent === window) {
+      setFidelite({ etat: "indisponible" });
+      return;
+    }
+    setFidelite({ etat: "chargement" });
+    window.parent.postMessage(
+      { source: SOURCE_CHAT, type: "demande-fidelite" },
+      origineHote.current ?? "*",
+    );
+
+    window.setTimeout(() => {
+      setFidelite((prec) => (prec.etat === "chargement" ? { etat: "indisponible" } : prec));
+    }, 12000);
+  }, []);
+
+  return { disponible, etats, messages, ajouter, fidelite, demanderFidelite };
 }

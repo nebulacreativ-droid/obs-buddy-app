@@ -238,8 +238,50 @@
 
     if (d.type === "ajouter-panier" && d.id && panierDisponible()) {
       ajouterAuPanier(d.id);
+      return;
+    }
+
+    if (d.type === "demande-fidelite") {
+      lireFidelite();
     }
   });
+
+  /**
+   * Palier de fidélité du client connecté.
+   *
+   * La requête part de la boutique avec les cookies de session : c'est
+   * PrestaShop qui identifie le client, pas nous. Aucune donnée client ne
+   * transite par le serveur de l'assistant — la boutique répond ici, et le
+   * chat se contente d'afficher.
+   */
+  function lireFidelite() {
+    var ps = boutique();
+    var base = ps && ps.urls && ps.urls.base_url ? ps.urls.base_url : "/";
+
+    fetch(base + "index.php?fc=module&module=obsbuddy&controller=fidelite", {
+      credentials: "same-origin",
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        repondre({
+          source: "obsbuddy-hote",
+          type: "resultat-fidelite",
+          connecte: !!(data && data.connecte),
+          prenom: data && data.prenom ? String(data.prenom) : "",
+          paliers: data && Array.isArray(data.paliers) ? data.paliers : [],
+        });
+      })
+      .catch(function () {
+        repondre({
+          source: "obsbuddy-hote",
+          type: "resultat-fidelite",
+          indisponible: true,
+        });
+      });
+  }
 
   // API minimale pour piloter le widget depuis la boutique
   // (ex: un bouton "Demander à O'Buddy" sur une fiche produit).

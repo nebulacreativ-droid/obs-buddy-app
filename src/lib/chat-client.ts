@@ -93,16 +93,17 @@ export async function streamChat(
   }
 }
 
-// [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables
-// [[MARQUES]] sélecteur de marques · [[RDV]] prise de rendez-vous
+// [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables · [[MARQUES]]
+// sélecteur de marques · [[RDV]] rendez-vous · [[FIDELITE]] palier client
 const MARQUEURS =
-  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV)\]\]/g;
+  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV|FIDELITE)\]\]/g;
 
 export type SegmentMessage =
   | { type: "texte"; valeur: string }
   | { type: "produit"; id: string }
   | { type: "marques" }
-  | { type: "rdv" };
+  | { type: "rdv" }
+  | { type: "fidelite" };
 
 export type MessageDecoupe = {
   segments: SegmentMessage[];
@@ -129,7 +130,10 @@ export function decouperMessage(texte: string): MessageDecoupe {
     if (match[1] !== undefined) {
       segments.push({ type: "produit", id: match[1].trim() });
     } else if (match[3] !== undefined) {
-      segments.push({ type: match[3] === "RDV" ? "rdv" : "marques" });
+      const genre = match[3];
+      segments.push({
+        type: genre === "RDV" ? "rdv" : genre === "FIDELITE" ? "fidelite" : "marques",
+      });
     } else if (match[2] !== undefined) {
       for (const option of match[2].split("|")) {
         const propre = option.trim();
