@@ -117,3 +117,35 @@ export function decouperMessage(texte: string): SegmentMessage[] {
   }
   return segments;
 }
+
+export type FragmentTexte =
+  | { type: "normal"; valeur: string }
+  | { type: "gras"; valeur: string }
+  | { type: "lien"; valeur: string; url: string };
+
+// **gras** ou [libellé](url)
+const MARKDOWN_LEGER = /\*\*([^*\n]+)\*\*|\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g;
+
+/**
+ * Filet de sécurité : le prompt interdit le markdown, mais un modèle en glisse
+ * toujours. On rend le gras et les liens plutôt que d'afficher la syntaxe brute.
+ */
+export function formaterTexte(texte: string): FragmentTexte[] {
+  const fragments: FragmentTexte[] = [];
+  let curseur = 0;
+
+  for (const m of texte.matchAll(MARKDOWN_LEGER)) {
+    const debut = m.index ?? 0;
+    if (debut > curseur) {
+      fragments.push({ type: "normal", valeur: texte.slice(curseur, debut) });
+    }
+    if (m[1]) fragments.push({ type: "gras", valeur: m[1] });
+    else fragments.push({ type: "lien", valeur: m[2], url: m[3] });
+    curseur = debut + m[0].length;
+  }
+
+  if (curseur < texte.length) {
+    fragments.push({ type: "normal", valeur: texte.slice(curseur) });
+  }
+  return fragments;
+}

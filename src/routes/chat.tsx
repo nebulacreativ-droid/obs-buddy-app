@@ -4,6 +4,7 @@ import { ArrowUp, ExternalLink, RotateCcw } from "lucide-react";
 import {
   streamChat,
   decouperMessage,
+  formaterTexte,
   type ChatMessage,
 } from "@/lib/chat-client";
 import type { ProduitCompact } from "@/lib/product-search";
@@ -263,7 +264,7 @@ function ContenuAssistant({
           if (!valeur) return null;
           return (
             <p key={i} className="text-sm leading-relaxed whitespace-pre-wrap">
-              {valeur}
+              <TexteFormate valeur={valeur} />
             </p>
           );
         }
@@ -273,6 +274,29 @@ function ContenuAssistant({
         return <CarteProduit key={i} produit={produit} />;
       })}
     </div>
+  );
+}
+
+function TexteFormate({ valeur }: { valeur: string }) {
+  return (
+    <>
+      {formaterTexte(valeur).map((f, i) => {
+        if (f.type === "gras") return <strong key={i}>{f.valeur}</strong>;
+        if (f.type === "lien")
+          return (
+            <a
+              key={i}
+              href={f.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-2"
+            >
+              {f.valeur}
+            </a>
+          );
+        return <span key={i}>{f.valeur}</span>;
+      })}
+    </>
   );
 }
 
