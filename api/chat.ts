@@ -20,7 +20,10 @@ import {
 } from "../src/lib/product-search.js";
 import { chercherInfo, SITE_URL } from "../src/lib/knowledge-base.js";
 
-const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+// gpt-4.1-mini plutôt que gpt-4o-mini : nettement plus fidèle aux consignes
+// (une seule question par message, marqueurs [[C:…]]), pour un coût qui reste
+// négligeable. Surchargeable par la variable d'environnement OPENAI_MODEL.
+const MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const MAX_MESSAGES = 30;
 const MAX_CHARS = 2000;
 const MAX_TOOL_STEPS = 4;
