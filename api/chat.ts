@@ -1,0 +1,321 @@
+// Fonction serverless O'Buddy — proxy OpenAI avec appel d'outils sur le catalogue.
+//
+// Runtime Node.js (pas Edge) : produits.json pèse 1.2 Mo, au-delà de la limite Edge.
+// Pas d'en-têtes CORS : l'API n'est appelable que depuis obs-obuddy.vercel.app,
+// ce qui empêche un tiers de consommer les crédits OpenAI du compte.
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import OpenAI from "openai";
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from "openai/resources/chat/completions";
+import {
+  searchProducts,
+  getTaxonomy,
+  type SearchParams,
+} from "../src/lib/product-search";
+import { chercherInfo, SITE_URL } from "../src/lib/knowledge-base";
+
+const MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const MAX_MESSAGES = 30;
+const MAX_CHARS = 2000;
+const MAX_TOOL_STEPS = 4;
+const MAX_TOKENS = 700;
+
+const TAXONOMIE = getTaxonomy();
+
+const SYSTEM_PROMPT = `Tu es O'Buddy, l'assistant barber d'O'Barbershop (${SITE_URL}).
+
+TON STYLE
+- Tu tutoies, tu es direct, chaleureux, jamais commercial-lourd.
+- Réponses COURTES : 2 à 4 phrases. Pas de listes à rallonge, pas de blabla.
+- Vocabulaire barber naturel (matos, fade, dégradé, routine), sans en faire trop.
+- Tu parles français.
+
+CE QUE TU FAIS
+1. Tu recommandes des produits du catalogue O'Barbershop.
+2. Tu réponds aux questions sur la boutique (livraison, compte pro…).
+3. Tu donnes du conseil technique barbier (entretien du matos, gestes, routines).
+
+RÈGLES ABSOLUES
+- Pour recommander un produit, tu DOIS d'abord appeler rechercher_produits.
+  N'invente JAMAIS un nom de produit, un prix, une marque ou un lien.
+- Si la recherche ne renvoie rien, dis-le franchement et propose une alternative
+  ou demande une précision. N'invente pas.
+- Pour toute question boutique, appelle infos_boutique. Si l'info n'est pas
+  disponible, dis que tu n'as pas l'info précise et renvoie vers le service
+  client sur ${SITE_URL}. N'invente jamais un délai, un tarif ou une procédure.
+- Tu ne promets jamais une disponibilité ou un délai de livraison précis.
+- Le conseil technique pur (sans produit) ne nécessite pas d'outil.
+
+CITER UN PRODUIT
+Quand tu recommandes un produit, écris son nom puis immédiatement son
+marqueur [[P:id]] — l'interface affichera une carte cliquable.
+Exemple : "La Cire Coiffante Mate de Sapiens [[P:12345]] fait le job."
+Maximum 3 produits par réponse. Toujours dire POURQUOI ce produit.
+
+MÉTHODE
+Si la demande est vague, pose UNE question de clarification (type de cheveux,
+budget, usage pro ou perso…), puis recherche. Ne pose jamais deux questions d'affilée.
+
+CATALOGUE — valeurs de filtres autorisées (n'en invente aucune autre)
+super_cat : ${TAXONOMIE.super_cat.join(", ")}
+segment : ${TAXONOMIE.segment.join(", ")}
+styles : ${TAXONOMIE.styles.join(", ")}
+type : ${TAXONOMIE.type.join(", ")}
+marques : ${TAXONOMIE.marque.join(", ")}`;
+
+const TOOLS: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "rechercher_produits",
+      description:
+        "Cherche dans le catalogue O'Barbershop. À appeler avant toute recommandation produit.",
+      parameters: {
+        type: "object",
+        properties: {
+          texte: {
+            type: "string",
+            description:
+              "Mots-clés libres (ex: 'cire mate', 'rasoir droit'). Tous les mots doivent correspondre : reste court et générique.",
+          },
+          type: {
+            type: "array",
+            items: { type: "string", enum: TAXONOMIE.type },
+            description: "Type(s) de produit.",
+          },
+          super_cat: {
+            type: "array",
+            items: { type: "string", enum: TAXONOMIE.super_cat },
+            description: "Grande famille de produit.",
+          },
+          marque: { type: "array", items: { type: "string", enum: TAXONOMIE.marque } },
+          segment: {
+            type: "array",
+            items: { type: "string", enum: TAXONOMIE.segment },
+            description: "Gamme de prix : entrée, milieu ou premium.",
+          },
+          styles: { type: "array", items: { type: "string", enum: TAXONOMIE.styles } },
+          prix_min: { type: "number" },
+          prix_max: { type: "number" },
+          tri: {
+            type: "string",
+            enum: ["pertinence", "prix_croissant", "prix_decroissant"],
+          },
+          limite: { type: "number", description: "Nombre de résultats (défaut 8, max 12)." },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "infos_boutique",
+      description:
+        "Renvoie les infos officielles de la boutique (livraison, compte pro, retours, contact…). À appeler pour toute question sur le fonctionnement de la boutique.",
+      parameters: {
+        type: "object",
+        properties: {
+          question: {
+            type: "string",
+            description: "La question de l'utilisateur, en clair.",
+          },
+        },
+        required: ["question"],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+function executerOutil(nom: string, args: Record<string, unknown>) {
+  if (nom === "rechercher_produits") {
+    const produits = searchProducts(args as SearchParams);
+    return {
+      pourLeModele: {
+        nombre: produits.length,
+        produits: produits.map((p) => ({
+          id: p.id,
+          nom: p.nom,
+          marque: p.marque,
+          prix: p.prix_aff,
+          categorie: p.categorie,
+          segment: p.segment,
+          dispo: p.dispo,
+          argument: p.argument,
+        })),
+      },
+      pourLInterface: produits,
+    };
+  }
+
+  if (nom === "infos_boutique") {
+    const question = String(args.question ?? "");
+    const fiches = chercherInfo(question);
+    const fiables = fiches.filter((f) => f.verifie && f.reponse);
+
+    if (!fiables.length) {
+      return {
+        pourLeModele: {
+          info_disponible: false,
+          consigne:
+            "Aucune information vérifiée sur ce sujet. Dis que tu n'as pas l'info précise " +
+            `et invite à contacter le service client via ${SITE_URL}. N'invente rien.`,
+        },
+        pourLInterface: null,
+      };
+    }
+
+    return {
+      pourLeModele: {
+        info_disponible: true,
+        reponses: fiables.map((f) => ({ sujet: f.sujet, reponse: f.reponse })),
+      },
+      pourLInterface: null,
+    };
+  }
+
+  return { pourLeModele: { erreur: `Outil inconnu: ${nom}` }, pourLInterface: null };
+}
+
+type MessageEntrant = { role: "user" | "assistant"; content: string };
+
+function validerRequete(body: unknown): { messages: MessageEntrant[] } | { erreur: string } {
+  if (!body || typeof body !== "object") return { erreur: "Corps de requête invalide." };
+  const { messages } = body as { messages?: unknown };
+
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return { erreur: "Aucun message fourni." };
+  }
+  if (messages.length > MAX_MESSAGES) {
+    return { erreur: "Conversation trop longue. Relance une nouvelle discussion." };
+  }
+
+  const propres: MessageEntrant[] = [];
+  for (const m of messages) {
+    if (!m || typeof m !== "object") return { erreur: "Message invalide." };
+    const { role, content } = m as { role?: unknown; content?: unknown };
+    if (role !== "user" && role !== "assistant") return { erreur: "Rôle invalide." };
+    if (typeof content !== "string") return { erreur: "Contenu invalide." };
+    propres.push({ role, content: content.slice(0, MAX_CHARS) });
+  }
+  return { messages: propres };
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    res.status(405).json({ erreur: "Méthode non autorisée." });
+    return;
+  }
+
+  const cle = process.env.OPENAI_API_KEY;
+  if (!cle) {
+    res.status(500).json({ erreur: "OPENAI_API_KEY absente de la configuration serveur." });
+    return;
+  }
+
+  const validation = validerRequete(req.body);
+  if ("erreur" in validation) {
+    res.status(400).json({ erreur: validation.erreur });
+    return;
+  }
+
+  const client = new OpenAI({ apiKey: cle });
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  const envoyer = (donnees: unknown) => {
+    res.write(`data: ${JSON.stringify(donnees)}\n\n`);
+  };
+
+  const messages: ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...validation.messages,
+  ];
+
+  try {
+    for (let etape = 0; etape < MAX_TOOL_STEPS; etape++) {
+      const stream = await client.chat.completions.create({
+        model: MODEL,
+        messages,
+        tools: TOOLS,
+        max_tokens: MAX_TOKENS,
+        temperature: 0.6,
+        stream: true,
+      });
+
+      let texte = "";
+      const appels: Array<{ id: string; nom: string; args: string }> = [];
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+
+        if (delta.content) {
+          texte += delta.content;
+          envoyer({ t: "text", d: delta.content });
+        }
+
+        // Les appels d'outils arrivent en fragments qu'il faut recoller par index.
+        for (const tc of delta.tool_calls ?? []) {
+          const i = tc.index;
+          appels[i] ??= { id: "", nom: "", args: "" };
+          if (tc.id) appels[i].id = tc.id;
+          if (tc.function?.name) appels[i].nom += tc.function.name;
+          if (tc.function?.arguments) appels[i].args += tc.function.arguments;
+        }
+      }
+
+      const valides = appels.filter((a) => a && a.id && a.nom);
+      if (valides.length === 0) break;
+
+      messages.push({
+        role: "assistant",
+        content: texte || null,
+        tool_calls: valides.map((a) => ({
+          id: a.id,
+          type: "function" as const,
+          function: { name: a.nom, arguments: a.args || "{}" },
+        })),
+      });
+
+      for (const appel of valides) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(appel.args || "{}");
+        } catch {
+          args = {};
+        }
+
+        const resultat = executerOutil(appel.nom, args);
+
+        if (resultat.pourLInterface?.length) {
+          envoyer({ t: "produits", d: resultat.pourLInterface });
+        }
+
+        messages.push({
+          role: "tool",
+          tool_call_id: appel.id,
+          content: JSON.stringify(resultat.pourLeModele),
+        });
+      }
+    }
+
+    envoyer({ t: "done" });
+  } catch (err) {
+    console.error("[api/chat]", err);
+    envoyer({
+      t: "error",
+      m: "Petit souci technique de mon côté. Réessaie dans un instant.",
+    });
+  } finally {
+    res.end();
+  }
+}

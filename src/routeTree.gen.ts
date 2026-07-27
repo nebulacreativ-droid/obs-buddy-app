@@ -9,10 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as EmbedModeRouteImport } from './routes/embed.$mode'
 import { Route as AssistantModeRouteImport } from './routes/assistant.$mode'
 
+const ChatRoute = ChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,36 +37,47 @@ const AssistantModeRoute = AssistantModeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/chat': typeof ChatRoute
   '/assistant/$mode': typeof AssistantModeRoute
   '/embed/$mode': typeof EmbedModeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/chat': typeof ChatRoute
   '/assistant/$mode': typeof AssistantModeRoute
   '/embed/$mode': typeof EmbedModeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/chat': typeof ChatRoute
   '/assistant/$mode': typeof AssistantModeRoute
   '/embed/$mode': typeof EmbedModeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/assistant/$mode' | '/embed/$mode'
+  fullPaths: '/' | '/chat' | '/assistant/$mode' | '/embed/$mode'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/assistant/$mode' | '/embed/$mode'
-  id: '__root__' | '/' | '/assistant/$mode' | '/embed/$mode'
+  to: '/' | '/chat' | '/assistant/$mode' | '/embed/$mode'
+  id: '__root__' | '/' | '/chat' | '/assistant/$mode' | '/embed/$mode'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChatRoute: typeof ChatRoute
   AssistantModeRoute: typeof AssistantModeRoute
   EmbedModeRoute: typeof EmbedModeRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/chat': {
+      id: '/chat'
+      path: '/chat'
+      fullPath: '/chat'
+      preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChatRoute: ChatRoute,
   AssistantModeRoute: AssistantModeRoute,
   EmbedModeRoute: EmbedModeRoute,
 }
