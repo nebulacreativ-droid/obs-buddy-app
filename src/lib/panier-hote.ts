@@ -17,6 +17,12 @@ export type EtatAjout = "envoi" | "ok" | "erreur";
 const SOURCE_CHAT = "obsbuddy-chat";
 const SOURCE_HOTE = "obsbuddy-hote";
 
+export type EnvoiPro =
+  | { etat: "repos" }
+  | { etat: "envoi" }
+  | { etat: "ok" }
+  | { etat: "erreur"; message: string };
+
 export type Fidelite =
   | { etat: "inconnu" }
   | { etat: "chargement" }
@@ -29,6 +35,7 @@ export function usePanierHote() {
   const [etats, setEtats] = useState<Record<string, EtatAjout>>({});
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [fidelite, setFidelite] = useState<Fidelite>({ etat: "inconnu" });
+  const [envoiPro, setEnvoiPro] = useState<EnvoiPro>({ etat: "repos" });
 
   // Origine de la boutique, apprise lors de la poignée de main. On ne poste
   // jamais vers "*" une fois qu'elle est connue.
@@ -54,6 +61,21 @@ export function usePanierHote() {
         if (typeof d.message === "string") {
           setMessages((prec) => ({ ...prec, [d.id]: d.message }));
         }
+        return;
+      }
+
+      if (d.type === "resultat-demande-pro") {
+        setEnvoiPro(
+          d.ok
+            ? { etat: "ok" }
+            : {
+                etat: "erreur",
+                message:
+                  typeof d.message === "string" && d.message
+                    ? d.message
+                    : "Envoi impossible pour le moment.",
+              },
+        );
         return;
       }
 
@@ -111,5 +133,39 @@ export function usePanierHote() {
     }, 12000);
   }, []);
 
-  return { disponible, etats, messages, ajouter, fidelite, demanderFidelite };
+  /** Transmet la demande de compte pro à la boutique, après validation par l'utilisateur. */
+  const envoyerDemandePro = useCallback((donnees: Record<string, string>) => {
+    if (typeof window === "undefined" || window.parent === window) {
+      setEnvoiPro({
+        etat: "erreur",
+        message:
+          "L'envoi n'est possible que depuis obarbershop.com. Ouvre O'Buddy depuis la boutique.",
+      });
+      return;
+    }
+    setEnvoiPro({ etat: "envoi" });
+    window.parent.postMessage(
+      { source: SOURCE_CHAT, type: "envoyer-demande-pro", donnees },
+      origineHote.current ?? "*",
+    );
+
+    window.setTimeout(() => {
+      setEnvoiPro((prec) =>
+        prec.etat === "envoi"
+          ? { etat: "erreur", message: "Pas de réponse de la boutique. Réessaie." }
+          : prec,
+      );
+    }, 15000);
+  }, []);
+
+  return {
+    disponible,
+    etats,
+    messages,
+    ajouter,
+    fidelite,
+    demanderFidelite,
+    envoiPro,
+    envoyerDemandePro,
+  };
 }

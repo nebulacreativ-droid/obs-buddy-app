@@ -243,8 +243,63 @@
 
     if (d.type === "demande-fidelite") {
       lireFidelite();
+      return;
+    }
+
+    if (d.type === "envoyer-demande-pro" && d.donnees) {
+      envoyerDemandePro(d.donnees);
     }
   });
+
+  /** Transmet la demande de compte pro au module, qui l'enregistre en SAV. */
+  function envoyerDemandePro(donnees) {
+    var ps = boutique();
+    var base = ps && ps.urls && ps.urls.base_url ? ps.urls.base_url : "/";
+
+    var corps = new URLSearchParams();
+    var champs = [
+      "societe",
+      "siret",
+      "nom",
+      "email",
+      "telephone",
+      "activite",
+      "ville",
+      "precisions",
+    ];
+    for (var i = 0; i < champs.length; i++) {
+      corps.append(champs[i], String(donnees[champs[i]] || ""));
+    }
+
+    fetch(base + "index.php?fc=module&module=obsbuddy&controller=contactpro", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: corps.toString(),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        repondre({
+          source: "obsbuddy-hote",
+          type: "resultat-demande-pro",
+          ok: !!(data && data.ok),
+          message: data && data.erreur ? String(data.erreur) : "",
+        });
+      })
+      .catch(function () {
+        repondre({
+          source: "obsbuddy-hote",
+          type: "resultat-demande-pro",
+          ok: false,
+          message: "Envoi impossible pour le moment.",
+        });
+      });
+  }
 
   /**
    * Palier de fidélité du client connecté.

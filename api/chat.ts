@@ -96,6 +96,16 @@ CE QUE TU FAIS
 5. Tu renseignes sur le statut d'une commande (outil suivi_commande).
 6. Tu affiches le palier de fidélité d'un client connecté (marqueur [[FIDELITE]]).
 
+DEVENIR CLIENT PRO
+Recueille, UNE question à la fois : raison sociale, SIRET, type d'activité,
+ville, nom du contact, email, téléphone, puis le besoin (volume, marques
+recherchées). Les quatre premiers obligatoires sont : raison sociale, SIRET,
+nom, email — n'appelle preparer_demande_pro qu'une fois ceux-là obtenus.
+Le SIRET fait 14 chiffres ; s'il n'en a pas encore, dis-lui qu'il peut faire
+la demande dès l'immatriculation et propose de garder le reste pour plus tard.
+Tu n'envoies jamais la demande toi-même : l'utilisateur valide le
+récapitulatif affiché par l'interface.
+
 PALIER DE FIDÉLITÉ
 Quand on te demande son palier, ses points ou son statut fidélité, réponds
 une phrase courte puis écris le marqueur [[FIDELITE]]. L'interface interroge
@@ -290,6 +300,35 @@ const TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "preparer_demande_pro",
+      description:
+        "Prépare une demande de compte professionnel une fois TOUTES les informations obligatoires recueillies (raison sociale, SIRET à 14 chiffres, nom du contact, email). L'interface affiche un récapitulatif que l'utilisateur valide lui-même : cet outil n'envoie rien.",
+      parameters: {
+        type: "object",
+        properties: {
+          societe: { type: "string", description: "Raison sociale." },
+          siret: { type: "string", description: "SIRET, 14 chiffres." },
+          nom: { type: "string", description: "Nom et prénom du contact." },
+          email: { type: "string" },
+          telephone: { type: "string" },
+          activite: {
+            type: "string",
+            description: "Barbershop, salon de coiffure, institut, grossiste…",
+          },
+          ville: { type: "string" },
+          precisions: {
+            type: "string",
+            description: "Besoin exprimé, volume, marques recherchées.",
+          },
+        },
+        required: ["societe", "siret", "nom", "email"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "suivi_commande",
       description:
         "Donne le statut d'une commande. Exige IMPÉRATIVEMENT la référence de commande ET l'email utilisé lors de l'achat. N'appelle cet outil que lorsque tu as les deux : sans quoi, demande d'abord ce qui manque.",
@@ -404,6 +443,52 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
       },
       pourLInterface: null,
       marques,
+    };
+  }
+
+  if (nom === "preparer_demande_pro") {
+    const texte = (cle: string, max = 200) =>
+      String(args[cle] ?? "").trim().slice(0, max);
+
+    const demande = {
+      societe: texte("societe"),
+      siret: texte("siret", 40).replace(/\s+/g, ""),
+      nom: texte("nom"),
+      email: texte("email"),
+      telephone: texte("telephone", 40),
+      activite: texte("activite"),
+      ville: texte("ville"),
+      precisions: texte("precisions", 1500),
+    };
+
+    // On valide ici ce que la boutique revalidera : autant le dire au modèle
+    // tout de suite plutôt que de faire échouer l'envoi après coup.
+    const manques: string[] = [];
+    if (!demande.societe) manques.push("la raison sociale");
+    if (!/^\d{14}$/.test(demande.siret)) manques.push("un SIRET à 14 chiffres");
+    if (!demande.nom) manques.push("le nom du contact");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(demande.email)) manques.push("un email valide");
+
+    if (manques.length) {
+      return {
+        pourLeModele: {
+          pret: false,
+          consigne: `Il manque ${manques.join(", ")}. Demande l'élément manquant, un seul à la fois.`,
+        },
+        pourLInterface: null,
+      };
+    }
+
+    return {
+      pourLeModele: {
+        pret: true,
+        consigne:
+          "Dis en une phrase que le récapitulatif est prêt, puis termine par le " +
+          "marqueur [[PRO]]. Ne réécris pas les informations : l'interface les affiche " +
+          "et c'est l'utilisateur qui valide l'envoi.",
+      },
+      pourLInterface: null,
+      demandePro: demande,
     };
   }
 
@@ -624,9 +709,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Les marques ne transitent que vers l'interface : le modèle n'en reçoit
         // qu'un résumé, c'est l'utilisateur qui coche dans le sélecteur.
-        const extra = resultat as { marques?: unknown[] };
+        const extra = resultat as {
+          marques?: unknown[];
+          demandePro?: Record<string, string>;
+        };
         if (extra.marques?.length) {
           envoyer({ t: "marques", d: extra.marques });
+        }
+        if (extra.demandePro) {
+          envoyer({ t: "demande_pro", d: extra.demandePro });
         }
 
         messages.push({

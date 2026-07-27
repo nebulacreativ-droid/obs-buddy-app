@@ -17,6 +17,7 @@ import {
 import { usePanierHote } from "@/lib/panier-hote";
 import type { ProduitCompact } from "@/lib/product-search";
 import type { MarqueProposee } from "@/lib/marques-search";
+import type { DemandePro } from "@/lib/chat-client";
 import { BookingWidget } from "@/components/BookingWidget";
 
 export const Route = createFileRoute("/chat")({
@@ -57,6 +58,13 @@ const PARCOURS = [
   },
   {
     numero: "04",
+    eyebrow: "Professionnel",
+    titre: "Devenir client pro",
+    desc: "Tarif pro, demande de contact",
+    message: "Je veux devenir client pro.",
+  },
+  {
+    numero: "05",
     eyebrow: "Divers",
     titre: "Autre question",
     desc: "Conseil technique, boutique",
@@ -71,6 +79,7 @@ function ChatPage() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [produits, setProduits] = useState<Record<string, ProduitCompact>>({});
   const [marques, setMarques] = useState<MarqueProposee[]>([]);
+  const [demandePro, setDemandePro] = useState<DemandePro | null>(null);
   const panier = usePanierHote();
 
   const finRef = useRef<HTMLDivElement>(null);
@@ -126,6 +135,7 @@ function ChatPage() {
             return suivant;
           }),
         onMarques: (liste) => setMarques(liste),
+        onDemandePro: (d) => setDemandePro(d),
         onErreur: (message) => {
           setErreur(message);
           // Retire la bulle vide si le modèle n'a rien produit.
@@ -145,6 +155,7 @@ function ChatPage() {
     setMessages([]);
     setProduits({});
     setMarques([]);
+    setDemandePro(null);
     setErreur(null);
     setEnCours(false);
   }
@@ -219,6 +230,7 @@ function ChatPage() {
                   texte={m.content}
                   produits={produits}
                   marques={marques}
+                  demandePro={demandePro}
                   panier={panier}
                   actif={dernier && !enCours}
                   onChoix={envoyer}
@@ -333,6 +345,7 @@ function ContenuAssistant({
   texte,
   produits,
   marques,
+  demandePro,
   panier,
   actif,
   onChoix,
@@ -340,6 +353,7 @@ function ContenuAssistant({
   texte: string;
   produits: Record<string, ProduitCompact>;
   marques: MarqueProposee[];
+  demandePro: DemandePro | null;
   panier: ReturnType<typeof usePanierHote>;
   actif: boolean;
   onChoix: (valeur: string) => void;
@@ -373,6 +387,11 @@ function ContenuAssistant({
         }
         if (s.type === "fidelite") {
           return <BlocFidelite key={i} panier={panier} />;
+        }
+        if (s.type === "demandePro") {
+          return demandePro ? (
+            <RecapDemandePro key={i} demande={demandePro} panier={panier} actif={actif} />
+          ) : null;
         }
         const produit = produits[s.id];
         // Le marqueur est ignoré si le produit n'a pas été remonté par la recherche.
@@ -547,6 +566,81 @@ function BlocFidelite({ panier }: { panier: ReturnType<typeof usePanierHote> }) 
           Je n'arrive pas à récupérer ton palier depuis ici. Tu le retrouves dans
           ton compte sur obarbershop.com.
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Récapitulatif avant envoi d'une demande de compte pro.
+ * L'utilisateur voit exactement ce qui part avant de valider : rien n'est
+ * transmis à la boutique sans son geste explicite.
+ */
+function RecapDemandePro({
+  demande,
+  panier,
+  actif,
+}: {
+  demande: DemandePro;
+  panier: ReturnType<typeof usePanierHote>;
+  actif: boolean;
+}) {
+  const { envoiPro, envoyerDemandePro } = panier;
+
+  const lignes: Array<[string, string]> = [
+    ["Société", demande.societe],
+    ["SIRET", demande.siret],
+    ["Contact", demande.nom],
+    ["Email", demande.email],
+    ["Téléphone", demande.telephone],
+    ["Activité", demande.activite],
+    ["Ville", demande.ville],
+  ];
+
+  return (
+    <div className="border-2 border-ink bg-paper p-3">
+      <div className="mb-2 font-display text-[10px] tracking-[0.3em] text-ink/60">
+        DEMANDE DE COMPTE PRO
+      </div>
+
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        {lignes.map(([libelle, valeur]) =>
+          valeur ? (
+            <div key={libelle} className="contents">
+              <dt className="text-ink/55">{libelle}</dt>
+              <dd className="font-medium break-words">{valeur}</dd>
+            </div>
+          ) : null,
+        )}
+      </dl>
+
+      {demande.precisions && (
+        <p className="mt-2 border-t border-ink/15 pt-2 text-xs text-ink/70">
+          {demande.precisions}
+        </p>
+      )}
+
+      {envoiPro.etat === "ok" ? (
+        <div className="mt-3 flex items-center gap-1.5 bg-ink px-3 py-2 font-display text-xs tracking-[0.2em] text-gold">
+          <Check className="h-3.5 w-3.5" /> DEMANDE ENVOYÉE
+        </div>
+      ) : (
+        <>
+          <button
+            onClick={() => envoyerDemandePro({ ...demande })}
+            disabled={!actif || envoiPro.etat === "envoi"}
+            className="tap-target mt-3 w-full bg-gold px-3 py-2 font-display text-xs tracking-[0.2em] text-ink transition hover:brightness-105 disabled:opacity-40"
+          >
+            {envoiPro.etat === "envoi" ? "ENVOI…" : "ENVOYER MA DEMANDE"}
+          </button>
+          <p className="mt-1.5 text-[10px] text-ink/50">
+            Ces informations partent à l'équipe O'Barbershop, qui te recontacte.
+          </p>
+        </>
+      )}
+
+      {envoiPro.etat === "erreur" && (
+        <p className="mt-1.5 text-[11px] text-[var(--rouge)]">{envoiPro.message}</p>
       )}
     </div>
   );

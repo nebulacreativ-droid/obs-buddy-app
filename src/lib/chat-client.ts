@@ -4,10 +4,23 @@ import type { MarqueProposee } from "./marques-search";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
+/** Demande de compte professionnel, validée côté serveur avant affichage. */
+export type DemandePro = {
+  societe: string;
+  siret: string;
+  nom: string;
+  email: string;
+  telephone: string;
+  activite: string;
+  ville: string;
+  precisions: string;
+};
+
 export type EvenementChat =
   | { t: "text"; d: string }
   | { t: "produits"; d: ProduitCompact[] }
   | { t: "marques"; d: MarqueProposee[] }
+  | { t: "demande_pro"; d: DemandePro }
   | { t: "done" }
   | { t: "error"; m: string };
 
@@ -15,6 +28,7 @@ export type CallbacksChat = {
   onTexte: (fragment: string) => void;
   onProduits: (produits: ProduitCompact[]) => void;
   onMarques: (marques: MarqueProposee[]) => void;
+  onDemandePro: (demande: DemandePro) => void;
   onErreur: (message: string) => void;
 };
 
@@ -83,6 +97,7 @@ export async function streamChat(
         if (evenement.t === "text") callbacks.onTexte(evenement.d);
         else if (evenement.t === "produits") callbacks.onProduits(evenement.d);
         else if (evenement.t === "marques") callbacks.onMarques(evenement.d);
+        else if (evenement.t === "demande_pro") callbacks.onDemandePro(evenement.d);
         else if (evenement.t === "error") callbacks.onErreur(evenement.m);
       }
     }
@@ -95,15 +110,17 @@ export async function streamChat(
 
 // [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables · [[MARQUES]]
 // sélecteur de marques · [[RDV]] rendez-vous · [[FIDELITE]] palier client
+// [[PRO]] récapitulatif de demande de compte professionnel
 const MARQUEURS =
-  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV|FIDELITE)\]\]/g;
+  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV|FIDELITE|PRO)\]\]/g;
 
 export type SegmentMessage =
   | { type: "texte"; valeur: string }
   | { type: "produit"; id: string }
   | { type: "marques" }
   | { type: "rdv" }
-  | { type: "fidelite" };
+  | { type: "fidelite" }
+  | { type: "demandePro" };
 
 export type MessageDecoupe = {
   segments: SegmentMessage[];
@@ -132,7 +149,14 @@ export function decouperMessage(texte: string): MessageDecoupe {
     } else if (match[3] !== undefined) {
       const genre = match[3];
       segments.push({
-        type: genre === "RDV" ? "rdv" : genre === "FIDELITE" ? "fidelite" : "marques",
+        type:
+          genre === "RDV"
+            ? "rdv"
+            : genre === "FIDELITE"
+              ? "fidelite"
+              : genre === "PRO"
+                ? "demandePro"
+                : "marques",
       });
     } else if (match[2] !== undefined) {
       for (const option of match[2].split("|")) {
