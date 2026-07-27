@@ -141,7 +141,7 @@ function ChatPage() {
   const vide = messages.length === 0;
 
   return (
-    <div className="flex h-dvh flex-col bg-gold text-ink">
+    <div className="flex h-dvh flex-col bg-background text-ink">
       <header className="flex shrink-0 items-center justify-between border-b-2 border-ink px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center bg-ink font-display text-sm text-gold">
@@ -234,7 +234,7 @@ function ChatPage() {
         </div>
       </div>
 
-      <div className="shrink-0 border-t-2 border-ink bg-gold px-4 py-3">
+      <div className="shrink-0 border-t-2 border-ink bg-background px-4 py-3">
         <div className="mx-auto flex max-w-2xl items-end gap-2">
           <textarea
             ref={champRef}
