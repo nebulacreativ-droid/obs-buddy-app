@@ -25,7 +25,7 @@ class Obsbuddy extends Module
     {
         $this->name = 'obsbuddy';
         $this->tab = 'front_office_features';
-        $this->version = '1.0.0';
+        $this->version = '1.1.0';
         $this->author = 'O\'Barbershop';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = ['min' => '1.7.0.0', 'max' => _PS_VERSION_];
@@ -45,6 +45,7 @@ class Obsbuddy extends Module
     public function install()
     {
         return parent::install()
+            && $this->creerTableDemandes()
             && $this->registerHook('displayBeforeBodyClosingTag')
             && Configuration::updateValue(self::CLE_ACTIF, true)
             && Configuration::updateValue(self::CLE_URL, self::URL_DEFAUT);
@@ -52,7 +53,8 @@ class Obsbuddy extends Module
 
     public function uninstall()
     {
-        return Configuration::deleteByName(self::CLE_ACTIF)
+        return $this->supprimerTableDemandes()
+            && Configuration::deleteByName(self::CLE_ACTIF)
             && Configuration::deleteByName(self::CLE_URL)
             && parent::uninstall();
     }
@@ -80,6 +82,37 @@ class Obsbuddy extends Module
         }
 
         return '<script src="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" defer></script>';
+    }
+
+    /**
+     * Table de limitation des demandes de contact pro.
+     *
+     * Elle ne conserve que des empreintes : l'adresse IP n'y figure jamais en
+     * clair, ce qui suffit à compter les envois sans conserver de donnée
+     * personnelle. Les lignes de plus de sept jours sont purgées à chaque envoi.
+     */
+    protected function creerTableDemandes()
+    {
+        $table = _DB_PREFIX_ . 'obsbuddy_demande';
+
+        $sql = 'CREATE TABLE IF NOT EXISTS `' . $table . '` ('
+            . '`id_demande` INT(11) NOT NULL AUTO_INCREMENT,'
+            . '`empreinte_ip` VARCHAR(64) NOT NULL,'
+            . '`empreinte_contenu` VARCHAR(64) NOT NULL,'
+            . '`date_add` DATETIME NOT NULL,'
+            . 'PRIMARY KEY (`id_demande`),'
+            . 'KEY `idx_ip_date` (`empreinte_ip`, `date_add`),'
+            . 'KEY `idx_contenu` (`empreinte_contenu`)'
+            . ') ENGINE=' . _MYSQL_ENGINE_ . ' DEFAULT CHARSET=utf8mb4;';
+
+        return Db::getInstance()->execute($sql);
+    }
+
+    protected function supprimerTableDemandes()
+    {
+        return Db::getInstance()->execute(
+            'DROP TABLE IF EXISTS `' . _DB_PREFIX_ . 'obsbuddy_demande`'
+        );
     }
 
     /** Page de configuration dans le back-office. */

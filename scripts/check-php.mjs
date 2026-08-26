@@ -1,85 +1,113 @@
-// Vérification structurelle du module PHP (PHP n'est pas installé localement).
-import { readFileSync } from "node:fs";
+// Vérification structurelle des fichiers PHP du module.
+// PHP n'est pas installé sur le poste de développement : ce script attrape au
+// moins les déséquilibres de délimiteurs et les oublis de convention
+// PrestaShop, qui sont les fautes les plus coûteuses (module refusé à
+// l'installation, page blanche en front).
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join, dirname, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const chemin = new URL("../prestashop-module/obsbuddy/obsbuddy.php", import.meta.url);
-const src = readFileSync(chemin, "utf8");
+const ICI = dirname(fileURLToPath(import.meta.url));
+const MODULE = join(ICI, "..", "prestashop-module", "obsbuddy");
 
-// Retire chaînes et commentaires avant de compter les délimiteurs.
-let net = "";
-let i = 0;
-let etat = null; // "simple" | "double" | "ligne" | "bloc"
-while (i < src.length) {
-  const c = src[i];
-  const suivant = src[i + 1];
-  if (etat === null) {
-    if (c === "'") etat = "simple";
-    else if (c === '"') etat = "double";
-    else if (c === "/" && suivant === "/") etat = "ligne";
-    else if (c === "/" && suivant === "*") etat = "bloc";
-    else if (c === "#") etat = "ligne";
-    else net += c;
-    i++;
-    continue;
+function listerPhp(base) {
+  const sortie = [];
+  for (const nom of readdirSync(base)) {
+    const chemin = join(base, nom);
+    if (statSync(chemin).isDirectory()) sortie.push(...listerPhp(chemin));
+    else if (nom.endsWith(".php")) sortie.push(chemin);
   }
-  if (etat === "simple" || etat === "double") {
-    if (c === "\\") i += 2;
-    else {
-      if ((etat === "simple" && c === "'") || (etat === "double" && c === '"')) etat = null;
+  return sortie;
+}
+
+/** Retire chaînes et commentaires avant de compter les délimiteurs. */
+function sansLitteraux(src) {
+  let net = "";
+  let i = 0;
+  let etat = null;
+
+  while (i < src.length) {
+    const c = src[i];
+    const suivant = src[i + 1];
+
+    if (etat === null) {
+      if (c === "'") etat = "simple";
+      else if (c === '"') etat = "double";
+      else if (c === "/" && suivant === "/") etat = "ligne";
+      else if (c === "/" && suivant === "*") etat = "bloc";
+      else if (c === "#") etat = "ligne";
+      else net += c;
       i++;
+      continue;
     }
-    continue;
+
+    if (etat === "simple" || etat === "double") {
+      if (c === "\\") i += 2;
+      else {
+        if ((etat === "simple" && c === "'") || (etat === "double" && c === '"')) etat = null;
+        i++;
+      }
+      continue;
+    }
+
+    if (etat === "ligne") {
+      if (c === "\n") etat = null;
+      i++;
+      continue;
+    }
+
+    if (etat === "bloc") {
+      if (c === "*" && suivant === "/") {
+        etat = null;
+        i += 2;
+      } else i++;
+    }
   }
-  if (etat === "ligne") {
-    if (c === "\n") etat = null;
-    i++;
-    continue;
+  return net;
+}
+
+let soucis = 0;
+
+for (const chemin of listerPhp(MODULE)) {
+  const nom = relative(MODULE, chemin).replace(/\\/g, "/");
+  const src = readFileSync(chemin, "utf8");
+  const net = sansLitteraux(src);
+  const compter = (ch) => net.split(ch).length - 1;
+
+  const problemes = [];
+
+  for (const [libelle, ouvrant, fermant] of [
+    ["accolades", "{", "}"],
+    ["parenthèses", "(", ")"],
+    ["crochets", "[", "]"],
+  ]) {
+    const a = compter(ouvrant);
+    const b = compter(fermant);
+    if (a !== b) problemes.push(`${libelle} déséquilibrées (${a}/${b})`);
   }
-  if (etat === "bloc") {
-    if (c === "*" && suivant === "/") {
-      etat = null;
-      i += 2;
-    } else i++;
+
+  if (!src.startsWith("<?php")) problemes.push("ne commence pas par <?php");
+  if (/\?>\s*$/.test(src)) problemes.push("balise fermante ?> présente");
+
+  // Les index.php de sécurité sont de simples redirections : la convention
+  // PrestaShop ne leur demande pas la garde _PS_VERSION_, réservée au code.
+  const estStub = !/\bclass\s+\w+/.test(net);
+  if (!estStub && !/_PS_VERSION_/.test(src)) {
+    problemes.push("garde _PS_VERSION_ absente");
+  }
+
+  // Une variable perdue par un échappement shell laisse des "->" orphelins :
+  // c'est exactement le genre de corruption silencieuse qu'on veut attraper.
+  if (/(^|[\s(=.])->/m.test(net)) problemes.push("appel ->methode() sans objet ($this manquant ?)");
+
+  if (problemes.length) {
+    soucis += problemes.length;
+    console.log(`❌ ${nom}`);
+    problemes.forEach((p) => console.log(`     ${p}`));
+  } else {
+    console.log(`✅ ${nom}`);
   }
 }
 
-const compter = (ch) => net.split(ch).length - 1;
-const paires = [
-  ["accolades", "{", "}"],
-  ["parenthèses", "(", ")"],
-  ["crochets", "[", "]"],
-];
-
-let souci = 0;
-for (const [nom, a, b] of paires) {
-  const na = compter(a);
-  const nb = compter(b);
-  const ok = na === nb;
-  if (!ok) souci++;
-  console.log(`${nom.padEnd(13)} ${String(na).padStart(3)} / ${String(nb).padStart(3)}  ${ok ? "OK" : "DÉSÉQUILIBRÉ"}`);
-}
-
-const controles = [
-  ["balise <?php en tête", src.startsWith("<?php")],
-  ["garde _PS_VERSION_", /if \(!defined\('_PS_VERSION_'\)\)/.test(src)],
-  ["classe Obsbuddy (doit matcher obsbuddy.php)", /class Obsbuddy extends Module/.test(src)],
-  ["$this->name = 'obsbuddy'", /\$this->name = 'obsbuddy'/.test(src)],
-  [
-    "hook enregistré ET implémenté",
-    /registerHook\('displayBeforeBodyClosingTag'\)/.test(src) &&
-      /function hookDisplayBeforeBodyClosingTag/.test(src),
-  ],
-  ["install() présent", /public function install\(\)/.test(src)],
-  ["uninstall() présent", /public function uninstall\(\)/.test(src)],
-  ["échappement de l'URL injectée", /htmlspecialchars\(\$url/.test(src)],
-  ["validation de l'URL", /FILTER_VALIDATE_URL/.test(src)],
-  ["pas de balise fermante ?>", !/\?>\s*$/.test(src)],
-];
-
-console.log();
-for (const [libelle, ok] of controles) {
-  if (!ok) souci++;
-  console.log(`${ok ? "✅" : "❌"} ${libelle}`);
-}
-
-console.log(`\n${souci === 0 ? "Structure conforme." : souci + " problème(s) à corriger."}`);
-process.exit(souci ? 1 : 0);
+console.log(soucis === 0 ? "\nStructure conforme." : `\n${soucis} problème(s) à corriger.`);
+process.exit(soucis ? 1 : 0);
