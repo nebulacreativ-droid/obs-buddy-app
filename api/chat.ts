@@ -110,6 +110,14 @@ Appelle preparer_demande_pro dès que tu as les quatre informations de base.
 Tu n'envoies jamais la demande toi-même : l'utilisateur valide le
 récapitulatif affiché par l'interface.
 
+PARLER À UN CONSEILLER
+Quand tu ne peux pas répondre — information que tu n'as pas, litige, demande
+technique pointue, réclamation — ou quand la personne demande explicitement un
+humain, propose la mise en relation : une phrase courte, puis le marqueur
+[[CONSEILLER]]. L'interface recueille son email et transmet l'échange à
+l'équipe. Ne promets jamais de délai de réponse.
+Ne le propose pas à la première difficulté : tente d'abord de répondre.
+
 PALIER DE FIDÉLITÉ
 Quand on te demande son palier, ses points ou son statut fidélité, réponds
 une phrase courte puis écris le marqueur [[FIDELITE]]. L'interface interroge
@@ -619,9 +627,58 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
 
 type MessageEntrant = { role: "user" | "assistant"; content: string };
 
-function validerRequete(body: unknown): { messages: MessageEntrant[] } | { erreur: string } {
+type ContexteEntrant = {
+  type?: string;
+  url?: string;
+  titre?: string;
+  idProduit?: string;
+};
+
+/**
+ * Traduit la page consultée en note pour le modèle. Sur une fiche produit,
+ * la fiche est résolue depuis le catalogue local : le modèle dispose du nom,
+ * du prix et de l'identifiant sans avoir à lancer une recherche.
+ */
+function noteDeContexte(ctx: ContexteEntrant | null): string | null {
+  if (!ctx?.type) return null;
+
+  if (ctx.type === "product" && ctx.idProduit) {
+    const p = moteur.parId(ctx.idProduit);
+    if (p) {
+      return (
+        `CONTEXTE — Le client consulte en ce moment la fiche de "${p.nom}" ` +
+        `(${p.marque}, ${p.prix_aff} €, ${p.categorie}, identifiant ${p.id}). ` +
+        "S'il pose une question sans préciser de quoi il parle, c'est de ce " +
+        `produit. Tu peux le citer directement avec [[P:${p.id}]] sans relancer ` +
+        "de recherche. Ne le mentionne pas spontanément s'il te parle d'autre chose."
+      );
+    }
+    // Produit hors catalogue local : on transmet au moins son intitulé.
+    if (ctx.titre) {
+      return `CONTEXTE — Le client consulte la fiche produit "${ctx.titre}".`;
+    }
+  }
+
+  if (ctx.type === "category" && ctx.titre) {
+    return `CONTEXTE — Le client navigue dans le rayon "${ctx.titre}".`;
+  }
+
+  if (ctx.type === "cart") {
+    return "CONTEXTE — Le client est sur sa page panier, probablement en fin de parcours.";
+  }
+
+  if (ctx.type === "order" || ctx.type === "order-confirmation") {
+    return "CONTEXTE — Le client est dans le tunnel de commande.";
+  }
+
+  return null;
+}
+
+function validerRequete(
+  body: unknown,
+): { messages: MessageEntrant[]; contexte: ContexteEntrant | null } | { erreur: string } {
   if (!body || typeof body !== "object") return { erreur: "Corps de requête invalide." };
-  const { messages } = body as { messages?: unknown };
+  const { messages, contexte } = body as { messages?: unknown; contexte?: unknown };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return { erreur: "Aucun message fourni." };
@@ -638,7 +695,23 @@ function validerRequete(body: unknown): { messages: MessageEntrant[] } | { erreu
     if (typeof content !== "string") return { erreur: "Contenu invalide." };
     propres.push({ role, content: content.slice(0, MAX_CHARS) });
   }
-  return { messages: propres };
+
+  // Le contexte vient du widget : on ne garde que des chaînes courtes et
+  // typées, jamais l'objet brut.
+  let contextePropre: ContexteEntrant | null = null;
+  if (contexte && typeof contexte === "object") {
+    const c = contexte as Record<string, unknown>;
+    const texte = (v: unknown) =>
+      typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : undefined;
+    contextePropre = {
+      type: texte(c.type),
+      url: texte(c.url),
+      titre: texte(c.titre),
+      idProduit: texte(c.idProduit),
+    };
+  }
+
+  return { messages: propres, contexte: contextePropre };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -672,8 +745,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.write(`data: ${JSON.stringify(donnees)}\n\n`);
   };
 
+  const note = noteDeContexte(validation.contexte);
+
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
+    ...(note ? [{ role: "system" as const, content: note }] : []),
     ...validation.messages,
   ];
 

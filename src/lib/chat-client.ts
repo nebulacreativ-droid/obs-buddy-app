@@ -1,6 +1,7 @@
 // Client SSE pour /api/chat. Isolé de l'UI pour rester testable.
 import type { ProduitCompact } from "./product-search";
 import type { MarqueProposee } from "./marques-search";
+import type { ContextePage } from "./panier-hote";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -44,13 +45,14 @@ export async function streamChat(
   messages: ChatMessage[],
   callbacks: CallbacksChat,
   signal?: AbortSignal,
+  contexte?: ContextePage | null,
 ): Promise<void> {
   let reponse: Response;
   try {
     reponse = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages }),
+      body: JSON.stringify({ messages, contexte: contexte ?? undefined }),
       signal,
     });
   } catch (err) {
@@ -111,9 +113,9 @@ export async function streamChat(
 
 // [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables · [[MARQUES]]
 // sélecteur de marques · [[RDV]] rendez-vous · [[FIDELITE]] palier client
-// [[PRO]] récapitulatif de demande de compte professionnel
+// [[PRO]] demande de compte pro · [[CONSEILLER]] mise en relation humaine
 const MARQUEURS =
-  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV|FIDELITE|PRO)\]\]/g;
+  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV|FIDELITE|PRO|CONSEILLER)\]\]/g;
 
 export type SegmentMessage =
   | { type: "texte"; valeur: string }
@@ -121,7 +123,8 @@ export type SegmentMessage =
   | { type: "marques" }
   | { type: "rdv" }
   | { type: "fidelite" }
-  | { type: "demandePro" };
+  | { type: "demandePro" }
+  | { type: "conseiller" };
 
 export type MessageDecoupe = {
   segments: SegmentMessage[];
@@ -157,7 +160,9 @@ export function decouperMessage(texte: string): MessageDecoupe {
               ? "fidelite"
               : genre === "PRO"
                 ? "demandePro"
-                : "marques",
+                : genre === "CONSEILLER"
+                  ? "conseiller"
+                  : "marques",
       });
     } else if (match[2] !== undefined) {
       for (const option of match[2].split("|")) {

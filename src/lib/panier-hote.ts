@@ -23,6 +23,14 @@ export type EnvoiPro =
   | { etat: "ok" }
   | { etat: "erreur"; message: string };
 
+/** Ce que le visiteur est en train de regarder sur la boutique. */
+export type ContextePage = {
+  type: string;
+  url?: string;
+  titre?: string;
+  idProduit?: string;
+};
+
 export type Fidelite =
   | { etat: "inconnu" }
   | { etat: "chargement" }
@@ -36,6 +44,8 @@ export function usePanierHote() {
   const [messages, setMessages] = useState<Record<string, string>>({});
   const [fidelite, setFidelite] = useState<Fidelite>({ etat: "inconnu" });
   const [envoiPro, setEnvoiPro] = useState<EnvoiPro>({ etat: "repos" });
+  const [envoiEscalade, setEnvoiEscalade] = useState<EnvoiPro>({ etat: "repos" });
+  const [page, setPage] = useState<ContextePage | null>(null);
 
   // Origine de la boutique, apprise lors de la poignée de main. On ne poste
   // jamais vers "*" une fois qu'elle est connue.
@@ -53,6 +63,15 @@ export function usePanierHote() {
       if (d.type === "bonjour") {
         origineHote.current = e.origin;
         setDisponible(Boolean(d.panierDisponible));
+        if (d.page && typeof d.page.type === "string") {
+          setPage({
+            type: d.page.type,
+            url: typeof d.page.url === "string" ? d.page.url : undefined,
+            titre: typeof d.page.titre === "string" ? d.page.titre : undefined,
+            idProduit:
+              typeof d.page.idProduit === "string" ? d.page.idProduit : undefined,
+          });
+        }
         return;
       }
 
@@ -61,6 +80,21 @@ export function usePanierHote() {
         if (typeof d.message === "string") {
           setMessages((prec) => ({ ...prec, [d.id]: d.message }));
         }
+        return;
+      }
+
+      if (d.type === "resultat-escalade") {
+        setEnvoiEscalade(
+          d.ok
+            ? { etat: "ok" }
+            : {
+                etat: "erreur",
+                message:
+                  typeof d.message === "string" && d.message
+                    ? d.message
+                    : "Envoi impossible pour le moment.",
+              },
+        );
         return;
       }
 
@@ -158,8 +192,34 @@ export function usePanierHote() {
     }, 15000);
   }, []);
 
+  /** Met le visiteur en relation avec un conseiller, historique à l'appui. */
+  const envoyerEscalade = useCallback((donnees: Record<string, string>) => {
+    if (typeof window === "undefined" || window.parent === window) {
+      setEnvoiEscalade({
+        etat: "erreur",
+        message:
+          "La mise en relation n'est possible que depuis obarbershop.com. Ouvre O'Buddy depuis la boutique.",
+      });
+      return;
+    }
+    setEnvoiEscalade({ etat: "envoi" });
+    window.parent.postMessage(
+      { source: SOURCE_CHAT, type: "envoyer-escalade", donnees },
+      origineHote.current ?? "*",
+    );
+
+    window.setTimeout(() => {
+      setEnvoiEscalade((prec) =>
+        prec.etat === "envoi"
+          ? { etat: "erreur", message: "Pas de réponse de la boutique. Réessaie." }
+          : prec,
+      );
+    }, 15000);
+  }, []);
+
   return {
     disponible,
+    page,
     etats,
     messages,
     ajouter,
@@ -167,5 +227,7 @@ export function usePanierHote() {
     demanderFidelite,
     envoiPro,
     envoyerDemandePro,
+    envoiEscalade,
+    envoyerEscalade,
   };
 }

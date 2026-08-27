@@ -22,6 +22,7 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
 
     const MAX_CHAMP = 200;
     const MAX_MESSAGE = 1500;
+    const MAX_HISTORIQUE = 2000;
 
     /** Quotas par visiteur : une vraie demande de compte pro est un acte rare. */
     const MAX_PAR_HEURE = 3;
@@ -206,6 +207,8 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
             return mb_substr(trim((string) Tools::getValue($nom, '')), 0, $max);
         };
 
+        $sujet = $lire('sujet', 20) === 'conseiller' ? 'conseiller' : 'pro';
+
         $email = $lire('email', self::MAX_CHAMP);
         $nom = $lire('nom', self::MAX_CHAMP);
         $telephone = $lire('telephone', 40);
@@ -215,14 +218,19 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
         if (!Validate::isEmail($email)) {
             return ['erreur' => "L'adresse email n'est pas valide."];
         }
-        if ($nom === '') {
-            return ['erreur' => 'Le nom est obligatoire.'];
-        }
-        if (strlen(preg_replace('/\D/', '', $telephone)) < 9) {
-            return ['erreur' => "Le numéro de téléphone n'est pas valide."];
-        }
         if ($message === '') {
             return ['erreur' => 'Merci de préciser votre demande.'];
+        }
+
+        // Une mise en relation avec un conseiller se contente de l'email :
+        // exiger nom et téléphone découragerait une demande d'aide simple.
+        if ($sujet === 'pro') {
+            if ($nom === '') {
+                return ['erreur' => 'Le nom est obligatoire.'];
+            }
+            if (strlen(preg_replace('/\D/', '', $telephone)) < 9) {
+                return ['erreur' => "Le numéro de téléphone n'est pas valide."];
+            }
         }
         // Société et SIRET sont facultatifs : un projet en création n'est pas
         // encore immatriculé. Mais un SIRET fourni doit être bien formé.
@@ -231,11 +239,13 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
         }
 
         return [
+            'sujet' => $sujet,
             'email' => $email,
             'nom' => $nom,
             'telephone' => $telephone,
             'message' => $message,
             'rappel' => $lire('rappel', 10) !== '',
+            'historique' => $lire('historique', self::MAX_HISTORIQUE),
             'siret' => $siret,
             'societe' => $lire('societe', self::MAX_CHAMP),
             'activite' => $lire('activite', self::MAX_CHAMP),
@@ -249,14 +259,23 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
      */
     protected function corpsDuMessage(array $c)
     {
+        $conseiller = $c['sujet'] === 'conseiller';
+
         $lignes = [
-            'Demande de contact professionnel (via O\'Buddy)',
+            $conseiller
+                ? 'Demande de mise en relation avec un conseiller (via O\'Buddy)'
+                : 'Demande de contact professionnel (via O\'Buddy)',
             '',
-            'Contact : ' . $c['nom'],
+            'Contact : ' . ($c['nom'] !== '' ? $c['nom'] : 'non communiqué'),
             'Email : ' . $c['email'],
-            'Téléphone : ' . $c['telephone'],
-            'Rappel souhaité : ' . ($c['rappel'] ? 'OUI' : 'non'),
         ];
+
+        if ($c['telephone'] !== '') {
+            $lignes[] = 'Téléphone : ' . $c['telephone'];
+        }
+        if (!$conseiller) {
+            $lignes[] = 'Rappel souhaité : ' . ($c['rappel'] ? 'OUI' : 'non');
+        }
 
         // Les champs facultatifs ne figurent que s'ils ont été renseignés :
         // une ligne "non précisée" n'apporte rien à l'équipe.
@@ -275,6 +294,13 @@ class ObsbuddyContactproModuleFrontController extends ModuleFrontController
         $lignes[] = '';
         $lignes[] = 'Demande :';
         $lignes[] = $c['message'];
+
+        // L'échange permet à l'équipe de reprendre où l'assistant s'est arrêté.
+        if ($c['historique'] !== '') {
+            $lignes[] = '';
+            $lignes[] = '--- Échange avec O\'Buddy ---';
+            $lignes[] = $c['historique'];
+        }
 
         return implode("\n", $lignes);
     }

@@ -30,6 +30,12 @@
   var NOIR = "#0F0F0F";
   var Z = 2147483000;
 
+  // Délais avant proposition spontanée. Plus court sur une fiche produit :
+  // le visiteur y est déjà en train d'hésiter.
+  var DELAI_FICHE_MS = 22000;
+  var DELAI_AUTRE_MS = 50000;
+  var CLE_INVITE = "obsbuddy-invite-vue";
+
   var styles =
     "" +
     ".obsbuddy-lanceur{position:fixed;right:20px;bottom:20px;z-index:" + Z + ";" +
@@ -44,6 +50,22 @@
     ".obsbuddy-pastille{position:absolute;top:-2px;right:-2px;width:14px;height:14px;" +
     "border-radius:50%;background:" + NOIR + ";border:2px solid " + JAUNE + "}" +
 
+    // ── Invitation spontanée ──────────────────────────────────────────────
+    ".obsbuddy-invite{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
+    "max-width:270px;background:#fff;color:" + NOIR + ";border:2px solid " + NOIR + ";" +
+    "border-radius:10px;padding:12px 34px 12px 14px;cursor:pointer;text-align:left;" +
+    "box-shadow:6px 6px 0 0 " + JAUNE + ";font:500 13px/1.45 'Montserrat',system-ui,sans-serif;" +
+    "opacity:0;transform:translateY(8px);pointer-events:none;" +
+    "transition:opacity .25s ease,transform .25s ease}" +
+    ".obsbuddy-invite.obsbuddy-visible{opacity:1;transform:none;pointer-events:auto}" +
+    ".obsbuddy-invite strong{display:block;font-weight:700;margin-bottom:2px}" +
+    ".obsbuddy-invite-produit{display:block;margin-top:6px;font-size:12px;color:#555;" +
+    "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".obsbuddy-invite-fermer{position:absolute;top:6px;right:6px;width:22px;height:22px;" +
+    "border:0;background:transparent;color:#888;cursor:pointer;font-size:16px;line-height:1;" +
+    "padding:0;border-radius:4px}" +
+    ".obsbuddy-invite-fermer:hover{background:#eee;color:" + NOIR + "}" +
+
     ".obsbuddy-panneau{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
     "width:400px;height:min(620px,calc(100vh - 120px));border:0;border-radius:12px;overflow:hidden;" +
     "background:#fff;box-shadow:0 16px 50px rgba(0,0,0,.3);" +
@@ -55,7 +77,11 @@
     "@media (max-width:520px){" +
     ".obsbuddy-panneau{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}" +
     ".obsbuddy-lanceur{right:16px;bottom:16px;width:54px;height:54px}" +
-    ".obsbuddy-lanceur.obsbuddy-masque{display:none}}";
+    ".obsbuddy-invite{right:16px;bottom:82px;max-width:calc(100vw - 32px)}" +
+    ".obsbuddy-lanceur.obsbuddy-masque{display:none}}" +
+
+    "@media (prefers-reduced-motion:reduce){" +
+    ".obsbuddy-invite,.obsbuddy-panneau,.obsbuddy-lanceur{transition:none}}";
 
   var feuille = document.createElement("style");
   feuille.textContent = styles;
@@ -82,6 +108,7 @@
   panneau.setAttribute("role", "dialog");
   panneau.setAttribute("aria-label", "O'Buddy — assistant barber");
 
+  var invite = null;
   var ouvert = false;
   var iframeCreee = false;
 
@@ -100,7 +127,10 @@
 
     // L'iframe n'est créée qu'à la première ouverture : aucun coût de
     // chargement pour les visiteurs qui n'ouvrent jamais le chat.
-    if (ouvert) creerIframe();
+    if (ouvert) {
+      creerIframe();
+      masquerInvite();
+    }
 
     panneau.classList.toggle("obsbuddy-ouvert", ouvert);
     lanceur.classList.toggle("obsbuddy-masque", ouvert);
@@ -119,12 +149,16 @@
   });
 
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && ouvert) basculer(false);
+    if (e.key === "Escape") {
+      if (ouvert) basculer(false);
+      else masquerInvite();
+    }
   });
 
   function monter() {
     document.body.appendChild(panneau);
     document.body.appendChild(lanceur);
+    programmerInvite();
   }
 
   if (document.readyState === "loading") {
@@ -133,14 +167,150 @@
     monter();
   }
 
-  // ── Pont panier ────────────────────────────────────────────────────────
-  // Le chat vit dans une iframe sur un autre domaine : il n'a ni la session
-  // client ni les cookies du panier. Il demande, c'est ce script — qui tourne
-  // sur la boutique — qui exécute l'ajout.
+  // ── Contexte de page ───────────────────────────────────────────────────
+  // Permet à O'Buddy de savoir ce que le visiteur est en train de regarder,
+  // et de répondre sur CE produit plutôt que de repartir de zéro.
 
   function boutique() {
     return typeof window.prestashop === "object" ? window.prestashop : null;
   }
+
+  function texteDe(selecteur) {
+    var el = document.querySelector(selecteur);
+    return el ? el.textContent.trim().slice(0, 120) : "";
+  }
+
+  function contextePage() {
+    var ps = boutique();
+    var page = ps && ps.page ? ps.page : {};
+    var contexte = {
+      type: String(page.page_name || ""),
+      url: location.href,
+    };
+
+    if (contexte.type === "product") {
+      var champ = document.querySelector(
+        '#product_page_product_id, input[name="id_product"]',
+      );
+      if (champ && champ.value) contexte.idProduit = String(champ.value);
+      contexte.titre = texteDe("h1") || document.title;
+    } else if (contexte.type === "category") {
+      contexte.titre = texteDe("h1") || document.title;
+    }
+
+    return contexte;
+  }
+
+  // ── Invitation spontanée ───────────────────────────────────────────────
+  // Une bulle discrète, jamais une ouverture forcée du panneau : proposer
+  // sans s'imposer. Une seule fois par session, et plus jamais si le
+  // visiteur la ferme ou ouvre le chat de lui-même.
+
+  function invitationDejaVue() {
+    try {
+      return window.sessionStorage.getItem(CLE_INVITE) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function marquerInvitationVue() {
+    try {
+      window.sessionStorage.setItem(CLE_INVITE, "1");
+    } catch (e) {
+      /* stockage refusé : l'invitation réapparaîtra au prochain chargement */
+    }
+  }
+
+  function masquerInvite() {
+    if (!invite) return;
+    invite.classList.remove("obsbuddy-visible");
+    marquerInvitationVue();
+    window.setTimeout(function () {
+      if (invite && invite.parentNode) invite.parentNode.removeChild(invite);
+      invite = null;
+    }, 260);
+  }
+
+  function afficherInvite(contexte) {
+    if (ouvert || invite || invitationDejaVue()) return;
+
+    var surFiche = contexte.type === "product";
+    var titre = surFiche ? "Une question sur ce produit ?" : "Besoin d'un coup de main ?";
+    var corps = surFiche
+      ? "Je te dis s'il est fait pour toi."
+      : "Routine, matos, commande — demande-moi.";
+
+    invite = document.createElement("div");
+    invite.className = "obsbuddy-invite";
+    invite.setAttribute("role", "button");
+    invite.setAttribute("tabindex", "0");
+    invite.setAttribute("aria-label", titre + " Ouvrir O'Buddy.");
+
+    var contenu = "<strong>" + titre + "</strong>" + corps;
+    if (surFiche && contexte.titre) {
+      contenu +=
+        '<span class="obsbuddy-invite-produit">' + echapper(contexte.titre) + "</span>";
+    }
+    invite.innerHTML =
+      contenu +
+      '<button class="obsbuddy-invite-fermer" type="button" aria-label="Fermer la proposition">&times;</button>';
+
+    invite.addEventListener("click", function (e) {
+      if (e.target && e.target.classList.contains("obsbuddy-invite-fermer")) {
+        e.stopPropagation();
+        masquerInvite();
+        return;
+      }
+      marquerInvitationVue();
+      basculer(true);
+    });
+
+    invite.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        marquerInvitationVue();
+        basculer(true);
+      }
+    });
+
+    document.body.appendChild(invite);
+    // Force un reflow pour que la transition d'apparition se joue.
+    void invite.offsetWidth;
+    invite.classList.add("obsbuddy-visible");
+  }
+
+  function echapper(texte) {
+    var div = document.createElement("div");
+    div.textContent = texte;
+    return div.innerHTML;
+  }
+
+  function programmerInvite() {
+    if (invitationDejaVue()) return;
+
+    var contexte = contextePage();
+    var delai = contexte.type === "product" ? DELAI_FICHE_MS : DELAI_AUTRE_MS;
+
+    var minuteur = window.setTimeout(function () {
+      afficherInvite(contexte);
+    }, delai);
+
+    // Intention de sortie : le curseur remonte hors de la fenêtre. Sur mobile
+    // l'événement n'existe pas, le délai reste le seul déclencheur.
+    var surSortie = function (e) {
+      if (e.clientY > 0 || invitationDejaVue()) return;
+      document.removeEventListener("mouseout", surSortie);
+      window.clearTimeout(minuteur);
+      afficherInvite(contexte);
+    };
+    document.addEventListener("mouseout", surSortie);
+  }
+
+  // ── Pont avec le chat ──────────────────────────────────────────────────
+  // Le chat vit dans une iframe sur un autre domaine : il n'a ni la session
+  // client ni les cookies du panier. Il demande, c'est ce script — qui tourne
+  // sur la boutique — qui exécute.
 
   /** Le panier n'est pilotable que si PrestaShop expose son jeton et son URL. */
   function panierDisponible() {
@@ -153,6 +323,12 @@
     if (iframe && iframe.contentWindow) {
       iframe.contentWindow.postMessage(message, ORIGINE);
     }
+  }
+
+  function urlModule(controleur) {
+    var ps = boutique();
+    var base = ps && ps.urls && ps.urls.base_url ? ps.urls.base_url : "/";
+    return base + "index.php?fc=module&module=obsbuddy&controller=" + controleur;
   }
 
   function ajouterAuPanier(idProduit) {
@@ -218,103 +394,15 @@
       });
   }
 
-  window.addEventListener("message", function (e) {
-    // Seule l'iframe du chat, sur son origine connue, peut piloter ce pont.
-    if (e.origin !== ORIGINE) return;
-    var iframe = panneau.querySelector("iframe");
-    if (!iframe || e.source !== iframe.contentWindow) return;
-
-    var d = e.data;
-    if (!d || d.source !== "obsbuddy-chat") return;
-
-    if (d.type === "pret") {
-      repondre({
-        source: "obsbuddy-hote",
-        type: "bonjour",
-        panierDisponible: panierDisponible(),
-      });
-      return;
-    }
-
-    if (d.type === "ajouter-panier" && d.id && panierDisponible()) {
-      ajouterAuPanier(d.id);
-      return;
-    }
-
-    if (d.type === "demande-fidelite") {
-      lireFidelite();
-      return;
-    }
-
-    if (d.type === "envoyer-demande-pro" && d.donnees) {
-      envoyerDemandePro(d.donnees);
-    }
-  });
-
-  /** Transmet la demande de compte pro au module, qui l'enregistre en SAV. */
-  function envoyerDemandePro(donnees) {
-    var ps = boutique();
-    var base = ps && ps.urls && ps.urls.base_url ? ps.urls.base_url : "/";
-
-    var corps = new URLSearchParams();
-    var champs = [
-      "nom",
-      "email",
-      "telephone",
-      "message",
-      "rappel",
-      "societe",
-      "siret",
-      "activite",
-      "ville",
-    ];
-    for (var i = 0; i < champs.length; i++) {
-      corps.append(champs[i], String(donnees[champs[i]] || ""));
-    }
-
-    fetch(base + "index.php?fc=module&module=obsbuddy&controller=contactpro", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      body: corps.toString(),
-    })
-      .then(function (r) {
-        return r.json();
-      })
-      .then(function (data) {
-        repondre({
-          source: "obsbuddy-hote",
-          type: "resultat-demande-pro",
-          ok: !!(data && data.ok),
-          message: data && data.erreur ? String(data.erreur) : "",
-        });
-      })
-      .catch(function () {
-        repondre({
-          source: "obsbuddy-hote",
-          type: "resultat-demande-pro",
-          ok: false,
-          message: "Envoi impossible pour le moment.",
-        });
-      });
-  }
-
   /**
    * Palier de fidélité du client connecté.
    *
    * La requête part de la boutique avec les cookies de session : c'est
    * PrestaShop qui identifie le client, pas nous. Aucune donnée client ne
-   * transite par le serveur de l'assistant — la boutique répond ici, et le
-   * chat se contente d'afficher.
+   * transite par le serveur de l'assistant.
    */
   function lireFidelite() {
-    var ps = boutique();
-    var base = ps && ps.urls && ps.urls.base_url ? ps.urls.base_url : "/";
-
-    fetch(base + "index.php?fc=module&module=obsbuddy&controller=fidelite", {
+    fetch(urlModule("fidelite"), {
       credentials: "same-origin",
       headers: { "X-Requested-With": "XMLHttpRequest" },
     })
@@ -338,6 +426,100 @@
         });
       });
   }
+
+  /** Envoi commun aux demandes pro et aux mises en relation avec un conseiller. */
+  function envoyerDemande(donnees, typeReponse) {
+    var corps = new URLSearchParams();
+    var champs = [
+      "sujet",
+      "nom",
+      "email",
+      "telephone",
+      "message",
+      "rappel",
+      "historique",
+      "societe",
+      "siret",
+      "activite",
+      "ville",
+    ];
+    for (var i = 0; i < champs.length; i++) {
+      corps.append(champs[i], String(donnees[champs[i]] || ""));
+    }
+
+    fetch(urlModule("contactpro"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: corps.toString(),
+    })
+      .then(function (r) {
+        return r.json();
+      })
+      .then(function (data) {
+        repondre({
+          source: "obsbuddy-hote",
+          type: typeReponse,
+          ok: !!(data && data.ok),
+          message: data && data.erreur ? String(data.erreur) : "",
+        });
+      })
+      .catch(function () {
+        repondre({
+          source: "obsbuddy-hote",
+          type: typeReponse,
+          ok: false,
+          message: "Envoi impossible pour le moment.",
+        });
+      });
+  }
+
+  window.addEventListener("message", function (e) {
+    // Seule l'iframe du chat, sur son origine connue, peut piloter ce pont.
+    if (e.origin !== ORIGINE) return;
+    var iframe = panneau.querySelector("iframe");
+    if (!iframe || e.source !== iframe.contentWindow) return;
+
+    var d = e.data;
+    if (!d || d.source !== "obsbuddy-chat") return;
+
+    if (d.type === "pret") {
+      repondre({
+        source: "obsbuddy-hote",
+        type: "bonjour",
+        panierDisponible: panierDisponible(),
+        page: contextePage(),
+      });
+      return;
+    }
+
+    if (d.type === "ajouter-panier" && d.id && panierDisponible()) {
+      ajouterAuPanier(d.id);
+      return;
+    }
+
+    if (d.type === "demande-fidelite") {
+      lireFidelite();
+      return;
+    }
+
+    if (d.type === "envoyer-demande-pro" && d.donnees) {
+      envoyerDemande(d.donnees, "resultat-demande-pro");
+      return;
+    }
+
+    if (d.type === "envoyer-escalade" && d.donnees) {
+      envoyerDemande(d.donnees, "resultat-escalade");
+      return;
+    }
+
+    if (d.type === "fermer") {
+      basculer(false);
+    }
+  });
 
   // API minimale pour piloter le widget depuis la boutique
   // (ex: un bouton "Demander à O'Buddy" sur une fiche produit).

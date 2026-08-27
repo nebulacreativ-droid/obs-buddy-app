@@ -4,7 +4,9 @@ import {
   ArrowRight,
   ArrowUp,
   Check,
+  Eye,
   ExternalLink,
+  Headset,
   RotateCcw,
   ShoppingBag,
 } from "lucide-react";
@@ -162,6 +164,7 @@ function ChatPage() {
         },
       },
       controller.signal,
+      panier.page,
     );
 
     setEnCours(false);
@@ -217,6 +220,10 @@ function ChatPage() {
             <p className="text-sm leading-relaxed">{ACCUEIL}</p>
           </Bulle>
 
+          {vide && panier.page?.type === "product" && panier.page.titre && (
+            <BandeauProduit titre={panier.page.titre} onDemander={envoyer} />
+          )}
+
           {vide && (
             <div className="flex flex-col gap-2.5">
               {PARCOURS.map((p) => (
@@ -252,6 +259,7 @@ function ChatPage() {
                   marques={marques}
                   demandePro={demandePro}
                   panier={panier}
+                  historique={messages}
                   actif={dernier && !enCours}
                   onChoix={envoyer}
                 />
@@ -367,6 +375,7 @@ function ContenuAssistant({
   marques,
   demandePro,
   panier,
+  historique,
   actif,
   onChoix,
 }: {
@@ -375,6 +384,7 @@ function ContenuAssistant({
   marques: MarqueProposee[];
   demandePro: DemandePro | null;
   panier: ReturnType<typeof usePanierHote>;
+  historique: ChatMessage[];
   actif: boolean;
   onChoix: (valeur: string) => void;
 }) {
@@ -407,6 +417,16 @@ function ContenuAssistant({
         }
         if (s.type === "fidelite") {
           return <BlocFidelite key={i} panier={panier} />;
+        }
+        if (s.type === "conseiller") {
+          return (
+            <CarteConseiller
+              key={i}
+              panier={panier}
+              historique={historique}
+              actif={actif}
+            />
+          );
         }
         if (s.type === "demandePro") {
           return demandePro ? (
@@ -662,6 +682,162 @@ function RecapDemandePro({
 
       {envoiPro.etat === "erreur" && (
         <p className="mt-1.5 text-[11px] text-[var(--rouge)]">{envoiPro.message}</p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Rappelle au visiteur la fiche qu'il consulte et lui ouvre une porte d'entrée
+ * directe. Le bot connaît déjà ce produit : il répondra sans reposer de question.
+ */
+function BandeauProduit({
+  titre,
+  onDemander,
+}: {
+  titre: string;
+  onDemander: (message: string) => void;
+}) {
+  return (
+    <div className="border-2 border-ink bg-gold/15 p-3">
+      <div className="flex items-start gap-2">
+        <Eye className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-[10px] tracking-[0.3em] text-ink/60">
+            TU REGARDES
+          </div>
+          <div className="mt-0.5 text-sm font-medium leading-tight">{titre}</div>
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <button
+          onClick={() => onDemander("Ce produit est fait pour moi ?")}
+          className="tap-target border-2 border-ink bg-paper px-3 py-1.5 text-xs font-medium transition hover:bg-ink hover:text-gold"
+        >
+          C'est fait pour moi ?
+        </button>
+        <button
+          onClick={() => onDemander("Comment on l'utilise, ce produit ?")}
+          className="tap-target border-2 border-ink bg-paper px-3 py-1.5 text-xs font-medium transition hover:bg-ink hover:text-gold"
+        >
+          Comment l'utiliser ?
+        </button>
+        <button
+          onClick={() => onDemander("Tu as mieux, ou un équivalent moins cher ?")}
+          className="tap-target border-2 border-ink bg-paper px-3 py-1.5 text-xs font-medium transition hover:bg-ink hover:text-gold"
+        >
+          Une alternative ?
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Mise en relation avec un conseiller. L'échange est joint pour que l'équipe
+ * reprenne où le bot s'est arrêté, et le visiteur voit ce qu'il transmet
+ * avant de valider.
+ */
+function CarteConseiller({
+  panier,
+  historique,
+  actif,
+}: {
+  panier: ReturnType<typeof usePanierHote>;
+  historique: ChatMessage[];
+  actif: boolean;
+}) {
+  const { envoiEscalade, envoyerEscalade } = panier;
+  const [email, setEmail] = useState("");
+  const [nom, setNom] = useState("");
+  const [precision, setPrecision] = useState("");
+
+  const emailValide = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const verrouille = envoiEscalade.etat === "envoi" || envoiEscalade.etat === "ok" || !actif;
+
+  // Les derniers échanges suffisent à recontextualiser sans noyer l'équipe.
+  const transcription = historique
+    .slice(-10)
+    .map((m) => `${m.role === "user" ? "Client" : "O'Buddy"} : ${m.content}`)
+    .join("\n")
+    .slice(0, 1400);
+
+  if (envoiEscalade.etat === "ok") {
+    return (
+      <div className="border-2 border-ink bg-paper p-3">
+        <div className="flex items-center gap-1.5 bg-ink px-3 py-2 font-display text-xs tracking-[0.2em] text-gold">
+          <Check className="h-3.5 w-3.5" /> TRANSMIS À L'ÉQUIPE
+        </div>
+        <p className="mt-2 text-xs text-ink/70">
+          Un conseiller O'Barbershop reprend ton échange et te répond par email.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="border-2 border-ink bg-paper p-3">
+      <div className="mb-2 flex items-center gap-1.5">
+        <Headset className="h-4 w-4" />
+        <span className="font-display text-[10px] tracking-[0.3em] text-ink/60">
+          PARLER À UN CONSEILLER
+        </span>
+      </div>
+
+      <p className="mb-2.5 text-xs text-ink/70">
+        Je transmets notre échange à l'équipe. Laisse-moi ton email pour qu'on te réponde.
+      </p>
+
+      <div className="flex flex-col gap-1.5">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={verrouille}
+          placeholder="ton@email.com"
+          className="border-2 border-ink bg-paper px-2.5 py-2 text-sm outline-none transition placeholder:text-ink/40 focus:shadow-[2px_2px_0_0_var(--gold)] disabled:opacity-60"
+        />
+        <input
+          type="text"
+          value={nom}
+          onChange={(e) => setNom(e.target.value)}
+          disabled={verrouille}
+          placeholder="Ton nom (facultatif)"
+          className="border-2 border-ink bg-paper px-2.5 py-2 text-sm outline-none transition placeholder:text-ink/40 focus:shadow-[2px_2px_0_0_var(--gold)] disabled:opacity-60"
+        />
+        <textarea
+          rows={2}
+          value={precision}
+          onChange={(e) => setPrecision(e.target.value)}
+          disabled={verrouille}
+          placeholder="Une précision à ajouter ? (facultatif)"
+          className="resize-none border-2 border-ink bg-paper px-2.5 py-2 text-sm outline-none transition placeholder:text-ink/40 focus:shadow-[2px_2px_0_0_var(--gold)] disabled:opacity-60"
+        />
+      </div>
+
+      <button
+        onClick={() =>
+          envoyerEscalade({
+            sujet: "conseiller",
+            nom: nom.trim(),
+            email: email.trim(),
+            message: precision.trim() || "Le client souhaite parler à un conseiller.",
+            historique: transcription,
+          })
+        }
+        disabled={verrouille || !emailValide}
+        className="tap-target mt-2 w-full bg-gold px-3 py-2 font-display text-xs tracking-[0.2em] text-ink transition hover:brightness-105 disabled:opacity-40"
+      >
+        {envoiEscalade.etat === "envoi" ? "ENVOI…" : "DEMANDER UN CONSEILLER"}
+      </button>
+
+      <p className="mt-1.5 text-[10px] text-ink/50">
+        Les derniers messages de notre échange seront joints.
+      </p>
+
+      {envoiEscalade.etat === "erreur" && (
+        <p className="mt-1.5 text-[11px] text-[var(--rouge)]">{envoiEscalade.message}</p>
       )}
     </div>
   );
