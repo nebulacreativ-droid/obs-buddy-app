@@ -754,13 +754,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.write(`data: ${JSON.stringify(donnees)}\n\n`);
   };
 
+  const { note, produit: produitConsulte } = resoudreContexte(validation.contexte);
+
   // Le modèle peut citer la fiche consultée sans lancer de recherche : sans
   // cet envoi, l'interface n'aurait pas les données et masquerait la carte.
   if (produitConsulte) {
     envoyer({ t: "produits", d: [produitConsulte] });
   }
-
-  const { note, produit: produitConsulte } = resoudreContexte(validation.contexte);
 
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
