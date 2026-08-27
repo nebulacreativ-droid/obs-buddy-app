@@ -175,10 +175,31 @@
     return typeof window.prestashop === "object" ? window.prestashop : null;
   }
 
-  function texteDe(selecteur) {
-    var el = document.querySelector(selecteur);
-    return el ? el.textContent.trim().slice(0, 120) : "";
+  /**
+   * Premier sélecteur qui donne un texte. L'ordre compte : un `h1` nu est le
+   * dernier recours, car ce n'est pas toujours le nom du produit selon le thème.
+   */
+  function premierTexte(selecteurs) {
+    for (var i = 0; i < selecteurs.length; i++) {
+      var el = document.querySelector(selecteurs[i]);
+      if (el) {
+        var texte = (el.getAttribute("content") || el.textContent || "").trim();
+        if (texte) return texte.slice(0, 120);
+      }
+    }
+    return "";
   }
+
+  var SELECTEURS_PRODUIT = [
+    '[itemprop="name"]',
+    'meta[property="og:title"]',
+    ".product-detail-name",
+    "h1.h1",
+    "#main h1",
+    "h1",
+  ];
+
+  var SELECTEURS_CATEGORIE = ["#js-product-list-header h1", ".block-category h1", "#main h1", "h1"];
 
   function contextePage() {
     var ps = boutique();
@@ -193,9 +214,9 @@
         '#product_page_product_id, input[name="id_product"]',
       );
       if (champ && champ.value) contexte.idProduit = String(champ.value);
-      contexte.titre = texteDe("h1") || document.title;
+      contexte.titre = premierTexte(SELECTEURS_PRODUIT);
     } else if (contexte.type === "category") {
-      contexte.titre = texteDe("h1") || document.title;
+      contexte.titre = premierTexte(SELECTEURS_CATEGORIE);
     }
 
     return contexte;
