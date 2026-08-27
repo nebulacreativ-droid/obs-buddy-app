@@ -639,39 +639,48 @@ type ContexteEntrant = {
  * la fiche est résolue depuis le catalogue local : le modèle dispose du nom,
  * du prix et de l'identifiant sans avoir à lancer une recherche.
  */
-function noteDeContexte(ctx: ContexteEntrant | null): string | null {
-  if (!ctx?.type) return null;
+function resoudreContexte(ctx: ContexteEntrant | null): {
+  note: string | null;
+  produit: ReturnType<typeof moteur.parId>;
+} {
+  const rien = { note: null, produit: null };
+  if (!ctx?.type) return rien;
 
   if (ctx.type === "product" && ctx.idProduit) {
     const p = moteur.parId(ctx.idProduit);
     if (p) {
-      return (
-        `CONTEXTE — Le client consulte en ce moment la fiche de "${p.nom}" ` +
-        `(${p.marque}, ${p.prix_aff} €, ${p.categorie}, identifiant ${p.id}). ` +
-        "S'il pose une question sans préciser de quoi il parle, c'est de ce " +
-        `produit. Tu peux le citer directement avec [[P:${p.id}]] sans relancer ` +
-        "de recherche. Ne le mentionne pas spontanément s'il te parle d'autre chose."
-      );
+      return {
+        produit: p,
+        note:
+          `CONTEXTE — Le client consulte en ce moment la fiche de "${p.nom}" ` +
+          `(${p.marque}, ${p.prix_aff} €, ${p.categorie}, identifiant ${p.id}). ` +
+          "S'il pose une question sans préciser de quoi il parle, c'est de ce " +
+          `produit. Tu peux le citer directement avec [[P:${p.id}]] sans relancer ` +
+          "de recherche. Ne le mentionne pas spontanément s'il te parle d'autre chose.",
+      };
     }
     // Produit hors catalogue local : on transmet au moins son intitulé.
     if (ctx.titre) {
-      return `CONTEXTE — Le client consulte la fiche produit "${ctx.titre}".`;
+      return { note: `CONTEXTE — Le client consulte la fiche produit "${ctx.titre}".`, produit: null };
     }
   }
 
   if (ctx.type === "category" && ctx.titre) {
-    return `CONTEXTE — Le client navigue dans le rayon "${ctx.titre}".`;
+    return { note: `CONTEXTE — Le client navigue dans le rayon "${ctx.titre}".`, produit: null };
   }
 
   if (ctx.type === "cart") {
-    return "CONTEXTE — Le client est sur sa page panier, probablement en fin de parcours.";
+    return {
+      note: "CONTEXTE — Le client est sur sa page panier, probablement en fin de parcours.",
+      produit: null,
+    };
   }
 
   if (ctx.type === "order" || ctx.type === "order-confirmation") {
-    return "CONTEXTE — Le client est dans le tunnel de commande.";
+    return { note: "CONTEXTE — Le client est dans le tunnel de commande.", produit: null };
   }
 
-  return null;
+  return rien;
 }
 
 function validerRequete(
@@ -745,7 +754,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.write(`data: ${JSON.stringify(donnees)}\n\n`);
   };
 
-  const note = noteDeContexte(validation.contexte);
+  // Le modèle peut citer la fiche consultée sans lancer de recherche : sans
+  // cet envoi, l'interface n'aurait pas les données et masquerait la carte.
+  if (produitConsulte) {
+    envoyer({ t: "produits", d: [produitConsulte] });
+  }
+
+  const { note, produit: produitConsulte } = resoudreContexte(validation.contexte);
 
   const messages: ChatCompletionMessageParam[] = [
     { role: "system", content: SYSTEM_PROMPT },
