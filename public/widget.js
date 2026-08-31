@@ -204,7 +204,7 @@
     // feuille, et la direction dit d'où elle vient.
     "@media (max-width:520px){" +
     ".obsbuddy-panneau{left:0;right:0;top:auto;bottom:0;width:100vw;" +
-    "height:min(78dvh,660px);border-radius:24px 24px 0 0;" +
+    "height:60dvh;border-radius:24px 24px 0 0;" +
     "box-shadow:0 -16px 46px rgba(0,0,0,.3);transform:translateY(100%)}" +
     ".obsbuddy-voile{display:block}" +
     ".obsbuddy-lanceur{right:16px;bottom:16px;width:54px;height:54px}" +
