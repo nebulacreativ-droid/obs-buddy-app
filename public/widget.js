@@ -99,20 +99,27 @@
     ".obsbuddy-q:hover{background:" + NOIR + ";color:" + JAUNE + ";transform:translateX(-2px)}" +
     ".obsbuddy-q:focus-visible{outline:3px solid " + JAUNE + ";outline-offset:2px}" +
 
-    ".obsbuddy-panneau{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
-    "width:400px;height:min(620px,calc(100vh - 120px));border:0;border-radius:12px;overflow:hidden;" +
-    "background:#fff;box-shadow:0 16px 50px rgba(0,0,0,.3);" +
-    "opacity:0;transform:translateY(12px) scale(.98);pointer-events:none;" +
-    "transition:opacity .18s ease,transform .18s ease}" +
+    // Panneau latéral ancré au bord droit, pleine hauteur : le visiteur garde
+    // la boutique à l'œil pendant qu'il discute. Il glisse depuis la droite
+    // plutôt que d'apparaître, ce qui rend l'ouverture lisible.
+    ".obsbuddy-panneau{position:fixed;right:0;top:0;bottom:0;z-index:" + Z + ";" +
+    "width:min(420px,100vw);height:100dvh;border:0;overflow:hidden;" +
+    "border-radius:16px 0 0 16px;background:#fff;" +
+    "box-shadow:-14px 0 44px rgba(0,0,0,.24);" +
+    "opacity:0;transform:translateX(100%);pointer-events:none;" +
+    "transition:opacity .22s ease,transform .28s cubic-bezier(.22,.7,.24,1)}" +
     ".obsbuddy-panneau.obsbuddy-ouvert{opacity:1;transform:none;pointer-events:auto}" +
     ".obsbuddy-panneau iframe{width:100%;height:100%;border:0;display:block}" +
 
+    // Le panneau recouvre l'angle du lanceur : on le retire à l'ouverture,
+    // la fermeture se fait depuis l'en-tête du chat.
+    ".obsbuddy-lanceur.obsbuddy-masque{display:none}" +
+
     "@media (max-width:520px){" +
-    ".obsbuddy-panneau{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}" +
+    ".obsbuddy-panneau{width:100vw;border-radius:0}" +
     ".obsbuddy-lanceur{right:16px;bottom:16px;width:54px;height:54px}" +
     ".obsbuddy-invite{right:16px;bottom:82px;max-width:calc(100vw - 32px)}" +
-    ".obsbuddy-questions{right:16px;bottom:82px;max-width:calc(100vw - 32px)}" +
-    ".obsbuddy-lanceur.obsbuddy-masque{display:none}}" +
+    ".obsbuddy-questions{right:16px;bottom:82px;max-width:calc(100vw - 32px)}}" +
 
     "@media (prefers-reduced-motion:reduce){" +
     ".obsbuddy-invite,.obsbuddy-questions,.obsbuddy-panneau,.obsbuddy-lanceur," +

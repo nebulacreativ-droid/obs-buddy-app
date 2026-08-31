@@ -228,8 +228,22 @@ export function usePanierHote() {
 
   const effacerQuestion = useCallback(() => setQuestionInitiale(null), []);
 
+  /** Le chat est-il ouvert depuis la boutique, ou consulté en direct ? */
+  const embarque = typeof window !== "undefined" && window.parent !== window;
+
+  /** Referme le panneau : le lanceur est masqué pendant l'ouverture. */
+  const fermer = useCallback(() => {
+    if (!embarque) return;
+    window.parent.postMessage(
+      { source: SOURCE_CHAT, type: "fermer" },
+      origineHote.current ?? "*",
+    );
+  }, [embarque]);
+
   return {
     disponible,
+    embarque,
+    fermer,
     page,
     questionInitiale,
     effacerQuestion,

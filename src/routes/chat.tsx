@@ -8,6 +8,7 @@ import {
   Headset,
   RotateCcw,
   ShoppingBag,
+  X,
 } from "lucide-react";
 import {
   streamChat,
@@ -211,15 +212,27 @@ function ChatPage() {
             </div>
           </div>
         </div>
-        {!vide && (
-          <button
-            onClick={reinitialiser}
-            className="tap-target flex items-center gap-1.5 border-2 border-paper/25 px-2.5 py-1.5 font-display text-[10px] tracking-[0.2em] text-paper transition hover:border-gold hover:text-gold"
-          >
-            <RotateCcw className="h-3 w-3" />
-            RECOMMENCER
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {!vide && (
+            <button
+              onClick={reinitialiser}
+              aria-label="Recommencer la discussion"
+              className="tap-target flex h-8 w-8 items-center justify-center border-2 border-paper/25 text-paper transition hover:border-gold hover:text-gold"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {/* Le lanceur est masqué pendant l'ouverture : la fermeture vit ici. */}
+          {panier.embarque && (
+            <button
+              onClick={panier.fermer}
+              aria-label="Fermer O'Buddy"
+              className="tap-target flex h-8 w-8 items-center justify-center border-2 border-paper/25 text-paper transition hover:border-gold hover:text-gold"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </header>
       <div className="h-1 shrink-0 bg-gold" />
 
