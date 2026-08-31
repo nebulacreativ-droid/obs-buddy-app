@@ -189,14 +189,30 @@
     // la fermeture se fait depuis l'en-tête du chat.
     ".obsbuddy-lanceur.obsbuddy-masque{display:none}" +
 
+    // Voile sous la feuille : sans lui, la bande de boutique restée visible
+    // ressemble à une zone cliquable qui ne répond pas. Il n'existe que sur
+    // téléphone, là où la feuille laisse quelque chose derrière elle.
+    ".obsbuddy-voile{position:fixed;inset:0;z-index:" + (Z - 1) + ";display:none;" +
+    "background:rgba(15,15,15,.42);opacity:0;pointer-events:none;" +
+    "transition:opacity .22s ease}" +
+    ".obsbuddy-voile.obsbuddy-ouvert{opacity:1;pointer-events:auto}" +
+
+    // Sur téléphone, pas de plein écran : une feuille posée sur le bas de
+    // l'écran. Elle laisse voir la boutique au-dessus — le visiteur sait où il
+    // est resté — et le pouce atteint tout sans changer de prise. Elle glisse
+    // depuis le bas, pas depuis la droite : c'est le geste attendu d'une
+    // feuille, et la direction dit d'où elle vient.
     "@media (max-width:520px){" +
-    ".obsbuddy-panneau{width:100vw;border-radius:0}" +
+    ".obsbuddy-panneau{left:0;right:0;top:auto;bottom:0;width:100vw;" +
+    "height:min(78dvh,660px);border-radius:24px 24px 0 0;" +
+    "box-shadow:0 -16px 46px rgba(0,0,0,.3);transform:translateY(100%)}" +
+    ".obsbuddy-voile{display:block}" +
     ".obsbuddy-lanceur{right:16px;bottom:16px;width:54px;height:54px}" +
     ".obsbuddy-questions{right:16px;bottom:82px;max-width:calc(100vw - 32px)}}" +
 
     "@media (prefers-reduced-motion:reduce){" +
     ".obsbuddy-questions,.obsbuddy-panneau,.obsbuddy-lanceur," +
-    ".obsbuddy-q{transition:none}}";
+    ".obsbuddy-voile,.obsbuddy-q{transition:none}}";
 
   var feuille = document.createElement("style");
   feuille.textContent = styles;
@@ -228,6 +244,12 @@
   lanceur.setAttribute("aria-label", "Ouvrir O'Buddy, l'assistant barber");
   lanceur.setAttribute("aria-expanded", "false");
   lanceur.innerHTML = ICONE_ETOILE + '<span class="obsbuddy-pastille"></span>';
+
+  var voile = document.createElement("div");
+  voile.className = "obsbuddy-voile";
+  voile.addEventListener("click", function () {
+    basculer(false);
+  });
 
   var panneau = document.createElement("div");
   panneau.className = "obsbuddy-panneau";
@@ -261,6 +283,7 @@
     }
 
     panneau.classList.toggle("obsbuddy-ouvert", ouvert);
+    voile.classList.toggle("obsbuddy-ouvert", ouvert);
     lanceur.classList.toggle("obsbuddy-masque", ouvert);
     lanceur.setAttribute("aria-expanded", String(ouvert));
     lanceur.setAttribute(
@@ -288,6 +311,7 @@
   // monter trop tôt lisait un tableau encore `undefined` — l'exception coupait
   // alors le reste du script, dont l'écouteur de messages.
   function monter() {
+    document.body.appendChild(voile);
     document.body.appendChild(panneau);
     document.body.appendChild(lanceur);
     programmerInvite();
