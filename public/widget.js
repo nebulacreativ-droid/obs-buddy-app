@@ -34,10 +34,6 @@
   // sinon le visiteur a déjà quitté la page — ou cliqué ailleurs.
   var DELAI_FICHE_MS = 3500;
   var DELAI_AUTRE_MS = 6000;
-  // Mémoire par TYPE de page, pas globale : avoir refusé les questions sur une
-  // fiche produit ne doit pas priver le visiteur du suivi de commande en
-  // arrivant sur l'accueil. Clé neuve : l'ancienne valeur globale ne bloque plus.
-  var CLE_PROPOSE = "obsbuddy-propose";
   var CLE_SESSION = "obsbuddy-session";
 
   /**
@@ -347,40 +343,22 @@
 
   // ── Questions proposées ────────────────────────────────────────────────
   // Deux ou trois questions posées d'emblée, jamais une ouverture forcée du
-  // panneau : proposer sans s'imposer. Une seule fois par type de page, et
-  // plus jamais sur ce type si le visiteur les ferme ou ouvre le chat.
+  // panneau : proposer sans s'imposer.
+  //
+  // Aucune mémoire entre les pages, volontairement. Une version précédente
+  // retenait en session les types de page déjà proposés ; fermer la bulle une
+  // fois, ou simplement ouvrir le chat, suffisait à faire taire O'Buddy —
+  // y compris après un rechargement, ce qui donnait l'impression qu'il était
+  // cassé. Chaque chargement de page repart donc de zéro : le refus ne vaut
+  // que pour la page en cours.
 
-  /** Type de page en cours : sert à ne mémoriser que celui-là. */
-  var typeCourant = "";
-
-  function typesProposes() {
-    try {
-      return (window.sessionStorage.getItem(CLE_PROPOSE) || "").split(",");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function dejaPropose(type) {
-    return typesProposes().indexOf(type || "defaut") !== -1;
-  }
-
-  function marquerPropose(type) {
-    var cible = type || typeCourant || "defaut";
-    if (dejaPropose(cible)) return;
-    try {
-      var liste = typesProposes().filter(Boolean);
-      liste.push(cible);
-      window.sessionStorage.setItem(CLE_PROPOSE, liste.join(","));
-    } catch (e) {
-      /* stockage refusé : les questions réapparaîtront au prochain chargement */
-    }
-  }
+  /** Le visiteur a écarté les questions sur CETTE page : on n'insiste plus. */
+  var refuseIci = false;
 
   function masquerInvite() {
     if (!invite) return;
     invite.classList.remove("obsbuddy-visible");
-    marquerPropose(typeCourant);
+    refuseIci = true;
     window.setTimeout(function () {
       if (invite && invite.parentNode) invite.parentNode.removeChild(invite);
       invite = null;
@@ -414,7 +392,7 @@
    * geste au lieu de trois.
    */
   function afficherQuestions(contexte) {
-    if (ouvert || invite || dejaPropose(contexte.type)) return;
+    if (ouvert || invite || refuseIci) return;
 
     var jeu = jeuPourPage(contexte);
 
@@ -438,7 +416,6 @@
       bouton.type = "button";
       bouton.textContent = question;
       bouton.addEventListener("click", function () {
-        marquerPropose(contexte.type);
         ouvrirAvecQuestion(question);
       });
       invite.appendChild(bouton);
@@ -457,8 +434,6 @@
 
   function programmerInvite() {
     var contexte = contextePage();
-    typeCourant = contexte.type || "defaut";
-    if (dejaPropose(contexte.type)) return;
 
     var delai =
       contexte.type === "product" || contexte.type === "category"
@@ -472,7 +447,7 @@
     // Intention de sortie : le curseur remonte hors de la fenêtre. Sur mobile
     // l'événement n'existe pas, le délai reste le seul déclencheur.
     var surSortie = function (e) {
-      if (e.clientY > 0 || dejaPropose(contexte.type)) return;
+      if (e.clientY > 0 || refuseIci) return;
       document.removeEventListener("mouseout", surSortie);
       window.clearTimeout(minuteur);
       afficherQuestions(contexte);
