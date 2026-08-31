@@ -309,13 +309,17 @@
     return "";
   }
 
+  // L'ordre compte, et le `[itemprop="name"]` nu est piégeux : le fil
+  // d'Ariane porte le même attribut, et il vient AVANT dans le document. Sans
+  // le `h1`, on lisait "Accueil" au lieu du nom du produit — et les questions
+  // proposées retombaient sur le jeu générique faute de mot-clé reconnaissable.
   var SELECTEURS_PRODUIT = [
-    '[itemprop="name"]',
-    'meta[property="og:title"]',
+    'h1[itemprop="name"]',
     ".product-detail-name",
-    "h1.h1",
     "#main h1",
+    "h1.h1",
     "h1",
+    'meta[property="og:title"]',
   ];
 
   var SELECTEURS_CATEGORIE = ["#js-product-list-header h1", ".block-category h1", "#main h1", "h1"];
