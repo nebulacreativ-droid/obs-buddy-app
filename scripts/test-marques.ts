@@ -63,4 +63,21 @@ console.log(
   `\n── Marques de matériel dans le mur de revente : ${intrus.length ? "❌ " + intrus.map((m) => m.nom).join(", ") : "✅ aucune"}`,
 );
 
-process.exit(fuite || intrus.length ? 1 : 0);
+
+console.log("\n── L'univers de la marque change-t-il la sélection ? ──");
+const parStyle: Record<string, string[]> = {};
+for (const style of ["old_school", "urbain", "rock", "moderne"]) {
+  parStyle[style] = catalogue
+    .proposer({ famille: "produit", styles: [style], limite: 5 })
+    .map((m) => m.nom);
+  console.log(`   ${style.padEnd(11)} → ${parStyle[style].join(", ")}`);
+}
+const identiques =
+  JSON.stringify(parStyle.old_school) === JSON.stringify(parStyle.urbain);
+console.log(
+  identiques
+    ? "   ⚠️  old school et urbain donnent la même liste : le style n'agit pas"
+    : "   ✅ chaque univers donne une sélection distincte",
+);
+
+process.exit(fuite || intrus.length || identiques ? 1 : 0);

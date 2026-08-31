@@ -456,6 +456,19 @@ function ContenuAssistant({
   );
 }
 
+/** Les styles du catalogue sont techniques : on les rend lisibles. */
+const LIBELLES_STYLE: Record<string, string> = {
+  old_school: "Old school",
+  moderne: "Moderne",
+  urbain: "Urbain",
+  rock: "Rock",
+  hipster: "Hipster",
+  naturel: "Naturel",
+  premium: "Premium",
+};
+
+const libelleStyle = (s: string) => LIBELLES_STYLE[s] ?? s;
+
 /** Sélection multiple des marques à mettre en rayon (parcours ouverture). */
 function SelecteurMarques({
   marques,
@@ -521,8 +534,8 @@ function SelecteurMarques({
                 <div
                   className={`truncate text-[10px] ${active ? "text-gold/70" : "text-ink/50"}`}
                 >
-                  {m.pays}
-                  {m.bestSeller ? " · Best-seller" : ""}
+                  {/* L'univers de la marque explique pourquoi elle est proposée. */}
+                  {m.styles.slice(0, 2).map(libelleStyle).join(" · ") || m.pays}
                   {m.madeInFrance ? " · MIF" : ""}
                 </div>
               </div>

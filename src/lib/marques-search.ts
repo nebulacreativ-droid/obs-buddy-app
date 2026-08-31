@@ -148,6 +148,7 @@ export function creerCatalogueMarques(
       s: Stats;
       score: number;
       profondeur: number;
+      aligne: boolean;
     }> = [];
 
     for (const { m, cle, s } of vendables) {
@@ -162,16 +163,20 @@ export function creerCatalogueMarques(
 
       let score = 0;
 
+      // L'univers de la marque prime : un shop old school ne se remplit pas
+      // des meilleures ventes d'un shop urbain. +9 par style commun, contre
+      // +12 au maximum pour les ventes — l'identité passe devant le volume.
+      let aligne = true;
       if (styles?.length) {
         const communs = m.styles.filter((st) => styles.includes(st)).length;
-        if (!communs) continue;
-        score += communs * 5;
+        aligne = communs > 0;
+        score += communs * 9;
       }
 
       // Les ventes réelles pèsent plus que l'étiquette best-seller, qui est
-      // une appréciation figée : bonus dégressif de +14 à +2.
+      // une appréciation figée : bonus dégressif de +12 à +2.
       const rang = rangVentes.get(cle);
-      if (rang !== undefined) score += Math.max(2, 14 - Math.floor(rang / 2));
+      if (rang !== undefined) score += Math.max(2, 12 - Math.floor(rang / 2));
       else if (f?.bs) score += 4;
 
       if (f?.mif) score += 1;
@@ -190,12 +195,21 @@ export function creerCatalogueMarques(
       // à profondeur comparable.
       if (fam === familleVoulue) score += 3;
 
-      notes.push({ m, f, s, score, profondeur });
+      notes.push({ m, f, s, score, profondeur, aligne });
     }
 
     notes.sort((a, b) => b.score - a.score || b.profondeur - a.profondeur);
 
-    return notes.slice(0, Math.min(limite, 16)).map(({ m, f, s }) => ({
+    // Cohérence d'abord : on ne sert que les marques alignées sur le style du
+    // shop. Mais si l'univers demandé est trop pointu pour remplir la liste,
+    // mieux vaut compléter que de renvoyer trois marques.
+    const alignees = notes.filter((n) => n.aligne);
+    const retenues =
+      alignees.length >= Math.min(limite, 6)
+        ? alignees
+        : [...alignees, ...notes.filter((n) => !n.aligne)];
+
+    return retenues.slice(0, Math.min(limite, 16)).map(({ m, f, s }) => ({
       id: m.id,
       nom: m.nom,
       pays: m.pays,
