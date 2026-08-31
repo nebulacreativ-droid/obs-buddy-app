@@ -2,6 +2,7 @@
 import type { ProduitCompact } from "./product-search";
 import type { MarqueProposee } from "./marques-search";
 import type { ContextePage } from "./panier-hote";
+import { FORMULAIRES } from "./formulaires";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -111,11 +112,12 @@ export async function streamChat(
   }
 }
 
-// [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables · [[MARQUES]]
-// sélecteur de marques · [[RDV]] rendez-vous · [[FIDELITE]] palier client
-// [[PRO]] demande de compte pro · [[CONSEILLER]] mise en relation humaine
+// [[P:id]] carte produit · [[C:a|b|c]] réponses cliquables · [[F:MODELE]]
+// cases à remplir · [[MARQUES]] sélecteur de marques · [[RDV]] rendez-vous
+// [[FIDELITE]] palier client · [[PRO]] récapitulatif de demande pro
+// [[CONSEILLER]] mise en relation humaine
 const MARQUEURS =
-  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[(MARQUES|RDV|FIDELITE|PRO|CONSEILLER)\]\]/g;
+  /\[\[P:([^\]]+)\]\]|\[\[C:([^\]]+)\]\]|\[\[F:([A-Z_]+)\]\]|\[\[(MARQUES|RDV|FIDELITE|PRO|CONSEILLER)\]\]/g;
 
 export type SegmentMessage =
   | { type: "texte"; valeur: string }
@@ -124,7 +126,9 @@ export type SegmentMessage =
   | { type: "rdv" }
   | { type: "fidelite" }
   | { type: "demandePro" }
-  | { type: "conseiller" };
+  | { type: "conseiller" }
+  /** Cases à remplir posées dans la conversation (voir formulaires.ts). */
+  | { type: "formulaire"; modele: string };
 
 export type MessageDecoupe = {
   segments: SegmentMessage[];
@@ -151,7 +155,13 @@ export function decouperMessage(texte: string): MessageDecoupe {
     if (match[1] !== undefined) {
       segments.push({ type: "produit", id: match[1].trim() });
     } else if (match[3] !== undefined) {
-      const genre = match[3];
+      // Un modèle inconnu est ignoré plutôt qu'affiché vide : le marqueur
+      // disparaît simplement du message.
+      if (FORMULAIRES[match[3]]) {
+        segments.push({ type: "formulaire", modele: match[3] });
+      }
+    } else if (match[4] !== undefined) {
+      const genre = match[4];
       segments.push({
         type:
           genre === "RDV"

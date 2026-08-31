@@ -20,6 +20,12 @@ import { usePanierHote } from "@/lib/panier-hote";
 import type { ProduitCompact } from "@/lib/product-search";
 import type { MarqueProposee } from "@/lib/marques-search";
 import type { DemandePro } from "@/lib/chat-client";
+import {
+  FORMULAIRES,
+  erreursFormulaire,
+  type ChampFormulaire,
+  type ModeleFormulaire,
+} from "@/lib/formulaires";
 import { BookingWidget } from "@/components/BookingWidget";
 import {
   chargerConversation,
@@ -423,6 +429,16 @@ function ContenuAssistant({
             />
           );
         }
+        if (s.type === "formulaire") {
+          return (
+            <FormulaireInline
+              key={i}
+              modele={FORMULAIRES[s.modele]}
+              actif={actif}
+              onEnvoyer={onChoix}
+            />
+          );
+        }
         if (s.type === "demandePro") {
           return demandePro ? (
             <RecapDemandePro key={i} demande={demandePro} panier={panier} actif={actif} />
@@ -448,6 +464,181 @@ function ContenuAssistant({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Cases à remplir posées dans la conversation.
+ *
+ * Le formulaire ne parle jamais à la boutique : il compose une phrase et
+ * l'envoie comme un message ordinaire. C'est O'Buddy qui décide ensuite quel
+ * outil appeler — les règles de confidentialité du serveur restent donc les
+ * seules à trancher, formulaire ou pas.
+ */
+function FormulaireInline({
+  modele,
+  actif,
+  onEnvoyer,
+}: {
+  modele: ModeleFormulaire;
+  actif: boolean;
+  onEnvoyer: (valeur: string) => void;
+}) {
+  const [valeurs, setValeurs] = useState<Record<string, string>>({});
+  // Les erreurs n'apparaissent qu'après une tentative : signaler "il manque ça"
+  // avant même la première frappe, c'est reprocher au visiteur d'arriver.
+  const [tente, setTente] = useState(false);
+
+  const erreurs = erreursFormulaire(modele, valeurs);
+
+  function valider() {
+    if (Object.keys(erreurs).length > 0) {
+      setTente(true);
+      return;
+    }
+    onEnvoyer(modele.resume(valeurs));
+  }
+
+  return (
+    <div className="rounded-2xl border border-ink/12 bg-paper p-3.5">
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+        {modele.titre}
+      </div>
+      <p className="mb-2.5 text-xs text-ink/70">{modele.intro}</p>
+
+      <div className="flex flex-col gap-2">
+        {modele.champs.map((champ) => (
+          <ChampFormulaireInline
+            key={champ.cle}
+            champ={champ}
+            valeur={valeurs[champ.cle] ?? ""}
+            erreur={tente ? erreurs[champ.cle] : undefined}
+            actif={actif}
+            onChange={(v) =>
+              setValeurs((prec) => ({ ...prec, [champ.cle]: v }))
+            }
+            onEntree={valider}
+          />
+        ))}
+      </div>
+
+      <button
+        onClick={valider}
+        disabled={!actif}
+        className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-xs font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
+      >
+        {modele.bouton}
+      </button>
+
+      {modele.note && (
+        <p className="mt-1.5 text-[10px] text-ink/50">{modele.note}</p>
+      )}
+    </div>
+  );
+}
+
+const CHAMP_BASE =
+  "w-full rounded-xl bg-paper px-3 py-2.5 text-sm outline-none transition " +
+  "placeholder:text-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60";
+
+function ChampFormulaireInline({
+  champ,
+  valeur,
+  erreur,
+  actif,
+  onChange,
+  onEntree,
+}: {
+  champ: ChampFormulaire;
+  valeur: string;
+  erreur?: string;
+  actif: boolean;
+  onChange: (valeur: string) => void;
+  onEntree: () => void;
+}) {
+  const bordure = erreur
+    ? "border border-[var(--rouge)]"
+    : "border border-ink/15 focus:border-ink/35";
+
+  const intitule = (
+    <span className="text-[11px] font-medium text-ink/60">{champ.libelle}</span>
+  );
+  const message = erreur ? (
+    <span className="text-[11px] text-[var(--rouge)]">{erreur}</span>
+  ) : null;
+
+  // Une pastille cochée se déselectionne d'un second appui : c'est facultatif,
+  // il faut pouvoir revenir en arrière sans recharger.
+  if (champ.type === "choix") {
+    return (
+      <div role="group" aria-label={champ.libelle} className="flex flex-col gap-1">
+        {intitule}
+        <div className="flex flex-wrap gap-1.5">
+          {(champ.options ?? []).map((option) => {
+            const choisi = valeur === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                disabled={!actif}
+                aria-pressed={choisi}
+                onClick={() => onChange(choisi ? "" : option)}
+                className={`tap-target rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
+                  choisi
+                    ? "border-ink bg-ink text-gold"
+                    : "border-ink/15 text-ink hover:border-ink/40"
+                }`}
+              >
+                {option}
+              </button>
+            );
+          })}
+        </div>
+        {message}
+      </div>
+    );
+  }
+
+  return (
+    <label className="flex flex-col gap-1">
+      {intitule}
+      {champ.type === "zone" ? (
+        <textarea
+          rows={2}
+          value={valeur}
+          disabled={!actif}
+          placeholder={champ.exemple}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${CHAMP_BASE} ${bordure} resize-none`}
+        />
+      ) : (
+        <input
+          type={champ.type === "email" ? "email" : champ.type === "tel" ? "tel" : "text"}
+          value={valeur}
+          disabled={!actif}
+          placeholder={champ.exemple}
+          autoComplete={
+            champ.autoComplete ??
+            (champ.type === "email" ? "email" : champ.type === "tel" ? "tel" : undefined)
+          }
+          inputMode={champ.type === "tel" ? "tel" : undefined}
+          autoCapitalize={champ.majuscules ? "characters" : undefined}
+          spellCheck={champ.majuscules ? false : undefined}
+          onChange={(e) =>
+            onChange(champ.majuscules ? e.target.value.toUpperCase() : e.target.value)
+          }
+          // Entrée valide le formulaire : sur mobile, c'est la touche "envoyer".
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onEntree();
+            }
+          }}
+          className={`${CHAMP_BASE} ${bordure}`}
+        />
+      )}
+      {message}
+    </label>
   );
 }
 
