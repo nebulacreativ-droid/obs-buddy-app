@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowRight,
   ArrowUp,
   Check,
   Eye,
@@ -52,7 +51,7 @@ const PARCOURS = [
   {
     numero: "02",
     eyebrow: "Conseil",
-    titre: "Recommandation produit",
+    titre: "Conseil produit",
     desc: "Routine perso ou matériel pro",
     message: "Je cherche une recommandation produit.",
   },
@@ -66,7 +65,7 @@ const PARCOURS = [
   {
     numero: "04",
     eyebrow: "Professionnel",
-    titre: "Devenir client pro",
+    titre: "Devenir pro",
     desc: "Tarif pro, demande de contact",
     message: "Je veux devenir client pro.",
   },
@@ -115,6 +114,16 @@ function ChatPage() {
   }, [messages, produits, marques, demandePro, enCours]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Question cliquée depuis une bulle de la boutique : on la joue comme si le
+  // visiteur venait de l'écrire, pour qu'il arrive sur une réponse en cours.
+  useEffect(() => {
+    if (!panier.questionInitiale || enCours) return;
+    const question = panier.questionInitiale;
+    panier.effacerQuestion();
+    void envoyer(question);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panier.questionInitiale, enCours]);
 
   async function envoyer(texte: string) {
     const contenu = texte.trim();
@@ -225,9 +234,15 @@ function ChatPage() {
           )}
 
           {vide && (
-            <div className="flex flex-col gap-2.5">
+            <div className="flex flex-wrap gap-1.5">
               {PARCOURS.map((p) => (
-                <CarteParcours key={p.numero} parcours={p} onChoisir={envoyer} />
+                <button
+                  key={p.numero}
+                  onClick={() => envoyer(p.message)}
+                  className="tap-target border-2 border-ink bg-paper px-3 py-1.5 text-xs font-medium transition hover:bg-ink hover:text-gold"
+                >
+                  {p.titre}
+                </button>
               ))}
             </div>
           )}
@@ -308,43 +323,6 @@ function ChatPage() {
         </p>
       </div>
     </div>
-  );
-}
-
-/** Tuile de parcours reprenant les cartes numérotées de la landing. */
-function CarteParcours({
-  parcours,
-  onChoisir,
-}: {
-  parcours: (typeof PARCOURS)[number];
-  onChoisir: (message: string) => void;
-}) {
-  return (
-    <button
-      onClick={() => onChoisir(parcours.message)}
-      className="tap-target group relative flex w-full flex-col overflow-hidden border-2 border-ink bg-paper text-left transition-all duration-200 hover:-translate-x-1 hover:-translate-y-1 hover:shadow-brut"
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-3 -top-5 font-display text-7xl leading-none text-ink/[0.06] transition-colors group-hover:text-gold/40"
-      >
-        {parcours.numero}
-      </div>
-
-      <div className="relative z-10 flex items-center justify-between bg-ink px-3 py-1.5 text-gold">
-        <span className="font-display text-[10px] tracking-[0.3em]">
-          {parcours.numero}&nbsp;&nbsp;{parcours.eyebrow.toUpperCase()}
-        </span>
-        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
-      </div>
-
-      <div className="relative z-10 px-3 py-2.5">
-        <div className="font-display text-xl leading-tight">{parcours.titre}</div>
-        <div className="text-xs text-ink/60">{parcours.desc}</div>
-      </div>
-
-      <div className="absolute inset-x-0 bottom-0 z-0 h-0 bg-gold transition-all duration-300 group-hover:h-1.5" />
-    </button>
   );
 }
 

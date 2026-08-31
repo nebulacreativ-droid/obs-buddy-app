@@ -30,11 +30,18 @@
   var NOIR = "#0F0F0F";
   var Z = 2147483000;
 
-  // Délais avant proposition spontanée. Plus court sur une fiche produit :
-  // le visiteur y est déjà en train d'hésiter.
-  var DELAI_FICHE_MS = 22000;
+  // Délais avant proposition spontanée. Bien plus court sur une fiche produit :
+  // le visiteur y hésite déjà, l'attendre au clic fait perdre la vente.
+  var DELAI_FICHE_MS = 12000;
   var DELAI_AUTRE_MS = 50000;
   var CLE_INVITE = "obsbuddy-invite-vue";
+
+  // Les trois questions qui reviennent devant une fiche produit.
+  var QUESTIONS_PRODUIT = [
+    "C'est fait pour moi ?",
+    "Comment je l'utilise ?",
+    "Tu as une alternative ?",
+  ];
 
   var styles =
     "" +
@@ -66,6 +73,32 @@
     "padding:0;border-radius:4px}" +
     ".obsbuddy-invite-fermer:hover{background:#eee;color:" + NOIR + "}" +
 
+    // ── Questions posées d'emblée sur une fiche produit ───────────────────
+    ".obsbuddy-questions{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
+    "display:flex;flex-direction:column;align-items:flex-end;gap:7px;max-width:300px;" +
+    "opacity:0;transform:translateY(8px);pointer-events:none;" +
+    "transition:opacity .25s ease,transform .25s ease}" +
+    ".obsbuddy-questions.obsbuddy-visible{opacity:1;transform:none;pointer-events:auto}" +
+
+    ".obsbuddy-q-entete{position:relative;background:" + NOIR + ";color:" + JAUNE + ";" +
+    "border-radius:10px 10px 4px 10px;padding:10px 34px 10px 13px;max-width:100%;" +
+    "font:700 12.5px/1.4 'Montserrat',system-ui,sans-serif;text-align:left;" +
+    "box-shadow:0 6px 20px rgba(0,0,0,.22)}" +
+    ".obsbuddy-q-produit{display:block;margin-top:3px;font-weight:500;font-size:11.5px;" +
+    "color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".obsbuddy-q-fermer{position:absolute;top:5px;right:5px;width:22px;height:22px;" +
+    "border:0;background:transparent;color:rgba(255,255,255,.55);cursor:pointer;" +
+    "font-size:16px;line-height:1;padding:0;border-radius:4px}" +
+    ".obsbuddy-q-fermer:hover{background:rgba(255,255,255,.15);color:#fff}" +
+
+    ".obsbuddy-q{background:#fff;color:" + NOIR + ";border:2px solid " + NOIR + ";" +
+    "border-radius:10px;padding:8px 12px;cursor:pointer;text-align:right;" +
+    "font:500 13px/1.3 'Montserrat',system-ui,sans-serif;" +
+    "box-shadow:3px 3px 0 0 " + JAUNE + ";" +
+    "transition:background .15s ease,color .15s ease,transform .15s ease}" +
+    ".obsbuddy-q:hover{background:" + NOIR + ";color:" + JAUNE + ";transform:translateX(-2px)}" +
+    ".obsbuddy-q:focus-visible{outline:3px solid " + JAUNE + ";outline-offset:2px}" +
+
     ".obsbuddy-panneau{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
     "width:400px;height:min(620px,calc(100vh - 120px));border:0;border-radius:12px;overflow:hidden;" +
     "background:#fff;box-shadow:0 16px 50px rgba(0,0,0,.3);" +
@@ -78,19 +111,23 @@
     ".obsbuddy-panneau{right:0;bottom:0;width:100vw;height:100dvh;border-radius:0}" +
     ".obsbuddy-lanceur{right:16px;bottom:16px;width:54px;height:54px}" +
     ".obsbuddy-invite{right:16px;bottom:82px;max-width:calc(100vw - 32px)}" +
+    ".obsbuddy-questions{right:16px;bottom:82px;max-width:calc(100vw - 32px)}" +
     ".obsbuddy-lanceur.obsbuddy-masque{display:none}}" +
 
     "@media (prefers-reduced-motion:reduce){" +
-    ".obsbuddy-invite,.obsbuddy-panneau,.obsbuddy-lanceur{transition:none}}";
+    ".obsbuddy-invite,.obsbuddy-questions,.obsbuddy-panneau,.obsbuddy-lanceur," +
+    ".obsbuddy-q{transition:none}}";
 
   var feuille = document.createElement("style");
   feuille.textContent = styles;
   document.head.appendChild(feuille);
 
-  var ICONE_CHAT =
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
-    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-    '<path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.9 9.9 0 0 1-4.2-.9L3 20.5l1.6-4.4A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg>';
+  // Une étoile plutôt qu'une bulle de dialogue : O'Buddy conseille et compose
+  // une sélection, il ne se contente pas de répondre. L'icône doit le dire.
+  var ICONE_ETOILE =
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+    '<path d="M12 1.6c.3 0 .6.2.7.5l1.7 5a4 4 0 0 0 2.5 2.5l5 1.7a.8.8 0 0 1 0 1.4l-5 1.7a4 4 0 0 0-2.5 2.5l-1.7 5a.8.8 0 0 1-1.4 0l-1.7-5a4 4 0 0 0-2.5-2.5l-5-1.7a.8.8 0 0 1 0-1.4l5-1.7a4 4 0 0 0 2.5-2.5l1.7-5c.1-.3.4-.5.7-.5z"/>' +
+    '<path d="M19.2 2.2c.2 0 .3.1.4.3l.6 1.7c.1.3.3.5.6.6l1.7.6a.4.4 0 0 1 0 .8l-1.7.6a1 1 0 0 0-.6.6l-.6 1.7a.4.4 0 0 1-.8 0l-.6-1.7a1 1 0 0 0-.6-.6l-1.7-.6a.4.4 0 0 1 0-.8l1.7-.6a1 1 0 0 0 .6-.6l.6-1.7c.1-.2.2-.3.4-.3z" opacity=".85"/></svg>';
 
   var ICONE_FERMER =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
@@ -101,7 +138,7 @@
   lanceur.type = "button";
   lanceur.setAttribute("aria-label", "Ouvrir O'Buddy, l'assistant barber");
   lanceur.setAttribute("aria-expanded", "false");
-  lanceur.innerHTML = ICONE_CHAT + '<span class="obsbuddy-pastille"></span>';
+  lanceur.innerHTML = ICONE_ETOILE + '<span class="obsbuddy-pastille"></span>';
 
   var panneau = document.createElement("div");
   panneau.className = "obsbuddy-panneau";
@@ -111,6 +148,8 @@
   var invite = null;
   var ouvert = false;
   var iframeCreee = false;
+  var chatPret = false;
+  var questionEnAttente = null;
 
   function creerIframe() {
     if (iframeCreee) return;
@@ -141,7 +180,7 @@
     );
     lanceur.innerHTML = ouvert
       ? ICONE_FERMER
-      : ICONE_CHAT + '<span class="obsbuddy-pastille"></span>';
+      : ICONE_ETOILE + '<span class="obsbuddy-pastille"></span>';
   }
 
   lanceur.addEventListener("click", function () {
@@ -253,14 +292,77 @@
     }, 260);
   }
 
+  /**
+   * Ouvre le chat avec une question déjà posée. Elle est mise en attente : le
+   * chat vient d'être créé et signalera lui-même quand il est prêt à la recevoir.
+   */
+  function ouvrirAvecQuestion(question) {
+    questionEnAttente = question;
+    basculer(true);
+    // Si le chat était déjà chargé, il ne renverra pas de poignée de main.
+    if (chatPret) transmettreQuestion();
+  }
+
+  function transmettreQuestion() {
+    if (!questionEnAttente) return;
+    repondre({
+      source: "obsbuddy-hote",
+      type: "poser-question",
+      texte: questionEnAttente,
+    });
+    questionEnAttente = null;
+  }
+
+  /**
+   * Sur une fiche produit, on ne se contente pas d'inviter : on pose déjà les
+   * questions. Le visiteur clique sur celle qui le concerne et le chat s'ouvre
+   * avec la réponse en route — un geste au lieu de trois.
+   */
+  function afficherQuestions(contexte) {
+    if (ouvert || invite || invitationDejaVue()) return;
+
+    invite = document.createElement("div");
+    invite.className = "obsbuddy-questions";
+
+    var entete = document.createElement("div");
+    entete.className = "obsbuddy-q-entete";
+    entete.innerHTML =
+      "Une question sur ce produit ?" +
+      (contexte.titre
+        ? '<span class="obsbuddy-q-produit">' + echapper(contexte.titre) + "</span>"
+        : "") +
+      '<button class="obsbuddy-q-fermer" type="button" aria-label="Fermer">&times;</button>';
+    entete.querySelector(".obsbuddy-q-fermer").addEventListener("click", masquerInvite);
+    invite.appendChild(entete);
+
+    QUESTIONS_PRODUIT.forEach(function (question) {
+      var bouton = document.createElement("button");
+      bouton.className = "obsbuddy-q";
+      bouton.type = "button";
+      bouton.textContent = question;
+      bouton.addEventListener("click", function () {
+        marquerInvitationVue();
+        ouvrirAvecQuestion(question);
+      });
+      invite.appendChild(bouton);
+    });
+
+    document.body.appendChild(invite);
+    void invite.offsetWidth;
+    invite.classList.add("obsbuddy-visible");
+  }
+
   function afficherInvite(contexte) {
     if (ouvert || invite || invitationDejaVue()) return;
 
-    var surFiche = contexte.type === "product";
-    var titre = surFiche ? "Une question sur ce produit ?" : "Besoin d'un coup de main ?";
-    var corps = surFiche
-      ? "Je te dis s'il est fait pour toi."
-      : "Routine, matos, commande — demande-moi.";
+    if (contexte.type === "product") {
+      afficherQuestions(contexte);
+      return;
+    }
+
+    var titre = "Besoin d'un coup de main ?";
+    var corps = "Routine, matos, commande — demande-moi.";
+    var surFiche = false;
 
     invite = document.createElement("div");
     invite.className = "obsbuddy-invite";
@@ -508,12 +610,14 @@
     if (!d || d.source !== "obsbuddy-chat") return;
 
     if (d.type === "pret") {
+      chatPret = true;
       repondre({
         source: "obsbuddy-hote",
         type: "bonjour",
         panierDisponible: panierDisponible(),
         page: contextePage(),
       });
+      transmettreQuestion();
       return;
     }
 

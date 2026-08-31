@@ -46,6 +46,7 @@ export function usePanierHote() {
   const [envoiPro, setEnvoiPro] = useState<EnvoiPro>({ etat: "repos" });
   const [envoiEscalade, setEnvoiEscalade] = useState<EnvoiPro>({ etat: "repos" });
   const [page, setPage] = useState<ContextePage | null>(null);
+  const [questionInitiale, setQuestionInitiale] = useState<string | null>(null);
 
   // Origine de la boutique, apprise lors de la poignée de main. On ne poste
   // jamais vers "*" une fois qu'elle est connue.
@@ -80,6 +81,14 @@ export function usePanierHote() {
         if (typeof d.message === "string") {
           setMessages((prec) => ({ ...prec, [d.id]: d.message }));
         }
+        return;
+      }
+
+      // Question posée depuis une bulle de la boutique : le chat la joue
+      // comme si le visiteur venait de l'écrire.
+      if (d.type === "poser-question" && typeof d.texte === "string") {
+        const texte = d.texte.trim().slice(0, 300);
+        if (texte) setQuestionInitiale(texte);
         return;
       }
 
@@ -217,9 +226,13 @@ export function usePanierHote() {
     }, 15000);
   }, []);
 
+  const effacerQuestion = useCallback(() => setQuestionInitiale(null), []);
+
   return {
     disponible,
     page,
+    questionInitiale,
+    effacerQuestion,
     etats,
     messages,
     ajouter,
