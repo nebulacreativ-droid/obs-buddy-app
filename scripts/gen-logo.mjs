@@ -1,40 +1,88 @@
-// Génère le logo.png 32x32 du module PrestaShop (bulle noire sur fond jaune OBS).
+// Génère le logo.png 32×32 du module PrestaShop : le visage d'O'Buddy.
+//
+// Le dessin de référence est src/components/LogoObuddy.tsx. On ne rasterise pas
+// le SVG (aucun moteur de rendu en Node ici) : les mêmes formes sont décrites
+// en géométrie, dans le même repère 48×48, puis échantillonnées. Toute retouche
+// du SVG doit donc être reportée ici — les constantes portent les mêmes valeurs
+// que les chemins, ce qui rend la correspondance vérifiable à l'œil.
 import { deflateSync } from "node:zlib";
 import { writeFileSync } from "node:fs";
 
-const T = 32;
+const T = 32; // taille de sortie
+const REPERE = 48; // repère du dessin
+const SS = 4; // sur-échantillonnage : 16 mesures par pixel, donc des bords lissés
+
 const JAUNE = [0xfc, 0xf2, 0x4f];
 const NOIR = [0x0f, 0x0f, 0x0f];
 
-// Bulle de chat : rectangle arrondi + petite pointe en bas à gauche.
-const dansBulle = (x, y) => {
-  const [x0, y0, x1, y1, r] = [5, 6, 26, 21, 4];
-  const dansRect = x >= x0 && x <= x1 && y >= y0 && y <= y1;
-  if (dansRect) {
-    const coins = [
-      [x0 + r, y0 + r],
-      [x1 - r, y0 + r],
-      [x0 + r, y1 - r],
-      [x1 - r, y1 - r],
-    ];
-    for (const [cx, cy] of coins) {
-      const horsX = x < x0 + r || x > x1 - r;
-      const horsY = y < y0 + r || y > y1 - r;
-      if (horsX && horsY) {
-        const proche = Math.abs(x - cx) <= r && Math.abs(y - cy) <= r;
-        if (proche && (x - cx) ** 2 + (y - cy) ** 2 > r * r) return false;
-      }
-    }
-    return true;
-  }
-  // pointe
-  return y > y1 && y <= y1 + 5 && x >= 9 && x <= 9 + (y1 + 5 - y);
+const dansEllipse = (x, y, cx, cy, rx, ry) =>
+  ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1;
+
+/** Coin arrondi du badge, dans le repère 48. */
+const dansBadge = (x, y) => {
+  const r = 13;
+  const cx = x < r ? r : x > REPERE - r ? REPERE - r : x;
+  const cy = y < r ? r : y > REPERE - r ? REPERE - r : y;
+  return (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 };
 
+/**
+ * La coupe : calotte prise dans l'ellipse du crâne, évidée par le front. Ce qui
+ * dépasse de part et d'autre du front forme les pattes — le dégradé court sur
+ * les côtés se lit là.
+ */
+const dansCoupe = (x, y) =>
+  dansEllipse(x, y, 24, 17.7, 11.5, 10.7) &&
+  y <= 22.4 &&
+  !(Math.abs(x - 24) <= 7.3 && y >= 14.2);
+
+const dansYeux = (x, y) =>
+  dansEllipse(x, y, 20.1, 25.6, 1.95, 1.95) ||
+  dansEllipse(x, y, 27.9, 25.6, 1.95, 1.95);
+
+/** La moustache, avec l'encoche sous le nez qui lui donne ses deux ailes. */
+const dansMoustache = (x, y) => {
+  if (!dansEllipse(x, y, 24, 32.8, 7.5, 3.0)) return false;
+  const encoche = y < 32 && Math.abs(x - 24) < (32 - y) * 2.6;
+  return !encoche;
+};
+
+/** L'éclat : étoile à quatre branches, en écho au lanceur sur la boutique. */
+const dansEclat = (x, y) => {
+  const a = 3.3;
+  const dx = Math.abs(x - 39.4) / a;
+  const dy = Math.abs(y - 12.7) / a;
+  return Math.sqrt(dx) + Math.sqrt(dy) <= 1;
+};
+
+const encre = (x, y) =>
+  dansCoupe(x, y) || dansYeux(x, y) || dansMoustache(x, y) || dansEclat(x, y);
+
 const lignes = [];
-for (let y = 0; y < T; y++) {
+for (let py = 0; py < T; py++) {
   const ligne = [0]; // filtre "none"
-  for (let x = 0; x < T; x++) ligne.push(...(dansBulle(x, y) ? NOIR : JAUNE));
+  for (let px = 0; px < T; px++) {
+    // Part d'encre et part de badge sur la surface du pixel : c'est ce qui
+    // évite l'escalier sur les courbes à cette taille.
+    let partEncre = 0;
+    let partBadge = 0;
+    for (let sy = 0; sy < SS; sy++) {
+      for (let sx = 0; sx < SS; sx++) {
+        const x = ((px + (sx + 0.5) / SS) / T) * REPERE;
+        const y = ((py + (sy + 0.5) / SS) / T) * REPERE;
+        if (!dansBadge(x, y)) continue;
+        partBadge++;
+        if (encre(x, y)) partEncre++;
+      }
+    }
+    const total = SS * SS;
+    // Hors badge : blanc, comme le fond des listes du back-office.
+    const fond = [0xff, 0xff, 0xff];
+    for (let c = 0; c < 3; c++) {
+      const dansCadre = (JAUNE[c] * (partBadge - partEncre) + NOIR[c] * partEncre) / (partBadge || 1);
+      ligne.push(Math.round((dansCadre * partBadge + fond[c] * (total - partBadge)) / total));
+    }
+  }
   lignes.push(Buffer.from(ligne));
 }
 

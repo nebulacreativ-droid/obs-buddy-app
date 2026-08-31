@@ -27,6 +27,7 @@ import {
   type ModeleFormulaire,
 } from "@/lib/formulaires";
 import { BookingWidget } from "@/components/BookingWidget";
+import { LogoObuddy } from "@/components/LogoObuddy";
 import {
   chargerConversation,
   sauvegarderConversation,
@@ -208,9 +209,7 @@ function ChatPage() {
       {/* Bandeau noir, logo jaune : l'ancrage de la DA O'Barbershop. */}
       <header className="flex shrink-0 items-center justify-between bg-ink px-4 py-3">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gold font-display text-base text-ink">
-            OB
-          </div>
+          <LogoObuddy className="h-9 w-9 shrink-0" />
           <div className="leading-none">
             <div className="font-display text-lg tracking-wide text-gold">
               O'BUDDY
@@ -1147,6 +1146,13 @@ function CarteProduit({
         <ExternalLink className="h-3.5 w-3.5 shrink-0 self-center text-ink/40 transition group-hover:text-ink" />
       </a>
 
+      {/*
+        Il y a toujours un bouton. L'ajout direct suppose que la boutique
+        héberge le chat et expose son jeton de panier ; hors de là — chat ouvert
+        seul, produit en rupture, ou déclinaison à choisir — on renvoie sur la
+        fiche plutôt que de laisser une carte sans action. Une carte muette,
+        c'est une vente qui attend un clic que personne ne devine.
+      */}
       {ajoutPossible && (
         <button
           onClick={() => panier.ajouter(produit.id)}
@@ -1169,16 +1175,30 @@ function CarteProduit({
         </button>
       )}
 
+      {!ajoutPossible && (
+        <a
+          href={produit.lien}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`tap-target flex w-full items-center justify-center gap-1.5 border-t border-ink/10 px-3 py-2.5 text-[13px] font-semibold transition ${
+            enRupture
+              ? "bg-paper text-ink/55 hover:bg-ink/5"
+              : "bg-gold text-ink hover:brightness-105"
+          }`}
+        >
+          <ShoppingBag className="h-3.5 w-3.5" />
+          {enRupture
+            ? "VOIR LA FICHE"
+            : produit.declinaisons
+              ? "CHOISIR MA VERSION"
+              : "VOIR LE PRODUIT"}
+        </a>
+      )}
+
       {etat === "erreur" && (
         <p className="border-t border-ink/10 px-3 py-2 text-[12px] text-[var(--rouge)]">
           {panier.messages[produit.id] ??
             "Ajout impossible. Ouvre la fiche produit pour commander."}
-        </p>
-      )}
-
-      {panier.disponible && produit.declinaisons && !enRupture && (
-        <p className="border-t border-ink/10 px-3 py-2 text-[12px] text-ink/60">
-          Plusieurs versions — choisis la tienne sur la fiche produit.
         </p>
       )}
     </div>

@@ -153,9 +153,11 @@
     ".obsbuddy-questions.obsbuddy-visible{opacity:1;transform:none;pointer-events:auto}" +
 
     ".obsbuddy-q-entete{position:relative;background:" + NOIR + ";color:" + JAUNE + ";" +
-    "border-radius:18px 18px 5px 18px;padding:11px 36px 11px 15px;max-width:100%;" +
+    "border-radius:18px 18px 5px 18px;padding:11px 36px 11px 13px;max-width:100%;" +
     "font:700 13.5px/1.4 'Montserrat',system-ui,sans-serif;text-align:left;" +
+    "display:flex;align-items:flex-start;gap:9px;" +
     "box-shadow:0 6px 20px rgba(0,0,0,.22)}" +
+    ".obsbuddy-visage{width:26px;height:26px;flex:0 0 26px;display:block;margin-top:-1px}" +
     ".obsbuddy-q-produit{display:block;margin-top:3px;font-weight:500;font-size:12.5px;" +
     "color:rgba(255,255,255,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".obsbuddy-q-fermer{position:absolute;top:5px;right:5px;width:22px;height:22px;" +
@@ -206,6 +208,15 @@
     '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
     '<path d="M12 1.6c.3 0 .6.2.7.5l1.7 5a4 4 0 0 0 2.5 2.5l5 1.7a.8.8 0 0 1 0 1.4l-5 1.7a4 4 0 0 0-2.5 2.5l-1.7 5a.8.8 0 0 1-1.4 0l-1.7-5a4 4 0 0 0-2.5-2.5l-5-1.7a.8.8 0 0 1 0-1.4l5-1.7a4 4 0 0 0 2.5-2.5l1.7-5c.1-.3.4-.5.7-.5z"/>' +
     '<path d="M19.2 2.2c.2 0 .3.1.4.3l.6 1.7c.1.3.3.5.6.6l1.7.6a.4.4 0 0 1 0 .8l-1.7.6a1 1 0 0 0-.6.6l-.6 1.7a.4.4 0 0 1-.8 0l-.6-1.7a1 1 0 0 0-.6-.6l-1.7-.6a.4.4 0 0 1 0-.8l1.7-.6a1 1 0 0 0 .6-.6l.6-1.7c.1-.2.2-.3.4-.3z" opacity=".85"/></svg>';
+
+  var ICONE_VISAGE =
+    '<svg class="obsbuddy-visage" viewBox="0 0 48 48" aria-hidden="true">' +
+    '<rect width="48" height="48" rx="13" fill="' + JAUNE + '"/>' +
+    '<path fill="' + NOIR + '" d="M24 7c-6.9 0-11.5 4.4-11.5 10.7 0 1.7.2 3.1.7 4.5l3.5-1.4v-2.5c0-2.7 3-4.4 7.3-4.4s7.3 1.7 7.3 4.4v2.5l3.5 1.4c.5-1.4.7-2.8.7-4.5C35.5 11.4 30.9 7 24 7Z"/>' +
+    '<circle cx="20.1" cy="25.6" r="1.95" fill="' + NOIR + '"/>' +
+    '<circle cx="27.9" cy="25.6" r="1.95" fill="' + NOIR + '"/>' +
+    '<path fill="' + NOIR + '" d="M24 32c-2.1-2.2-4.7-2.8-7.5-1.6.5 3.4 3.4 5.4 7.5 5.4s7-2 7.5-5.4c-2.8-1.2-5.4-.6-7.5 1.6Z"/>' +
+    '<path fill="' + NOIR + '" d="M39.4 9.6l.85 2.25 2.25.85-2.25.85-.85 2.25-.85-2.25-2.25-.85 2.25-.85.85-2.25Z"/></svg>';
 
   var ICONE_FERMER =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
@@ -402,10 +413,13 @@
     var entete = document.createElement("div");
     entete.className = "obsbuddy-q-entete";
     entete.innerHTML =
+      ICONE_VISAGE +
+      "<span>" +
       echapper(jeu.titre) +
       (contexte.titre
         ? '<span class="obsbuddy-q-produit">' + echapper(contexte.titre) + "</span>"
         : "") +
+      "</span>" +
       '<button class="obsbuddy-q-fermer" type="button" aria-label="Fermer">&times;</button>';
     entete.querySelector(".obsbuddy-q-fermer").addEventListener("click", masquerInvite);
     invite.appendChild(entete);
