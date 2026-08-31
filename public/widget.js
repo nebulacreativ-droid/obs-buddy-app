@@ -35,6 +35,7 @@
   var DELAI_FICHE_MS = 12000;
   var DELAI_AUTRE_MS = 50000;
   var CLE_INVITE = "obsbuddy-invite-vue";
+  var CLE_SESSION = "obsbuddy-session";
 
   // Les trois questions qui reviennent devant une fiche produit.
   var QUESTIONS_PRODUIT = [
@@ -641,6 +642,12 @@
       return;
     }
 
+    // Journalisation : le message part vers la boutique, jamais ailleurs.
+    if (d.type === "journaliser" && d.role && d.message) {
+      journaliser(d.role, d.message);
+      return;
+    }
+
     if (d.type === "envoyer-escalade" && d.donnees) {
       envoyerDemande(d.donnees, "resultat-escalade");
       return;
@@ -650,6 +657,47 @@
       basculer(false);
     }
   });
+
+  /**
+   * Identifiant de conversation, propre à l'onglet et tiré au hasard : il
+   * permet de regrouper les messages d'un même échange sans jamais désigner
+   * la personne qui écrit.
+   */
+  function idSession() {
+    try {
+      var existant = window.sessionStorage.getItem(CLE_SESSION);
+      if (existant) return existant;
+      var nouveau = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      window.sessionStorage.setItem(CLE_SESSION, nouveau);
+      return nouveau;
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function journaliser(role, message) {
+    var session = idSession();
+    if (!session) return;
+
+    var corps = new URLSearchParams({
+      session: session,
+      role: role === "bot" ? "bot" : "client",
+      message: String(message).slice(0, 1200),
+      page: contextePage().type || "",
+    });
+
+    // Envoi au fil de l'eau, sans bloquer la conversation ni la faire échouer.
+    fetch(urlModule("journal"), {
+      method: "POST",
+      credentials: "same-origin",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      body: corps.toString(),
+    }).catch(function () {});
+  }
 
   // API minimale pour piloter le widget depuis la boutique
   // (ex: un bouton "Demander à O'Buddy" sur une fiche produit).

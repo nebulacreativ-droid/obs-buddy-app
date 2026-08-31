@@ -228,6 +228,20 @@ export function usePanierHote() {
 
   const effacerQuestion = useCallback(() => setQuestionInitiale(null), []);
 
+  /**
+   * Fait remonter un message à la boutique pour le tableau de bord.
+   * Rien n'est envoyé si le chat est consulté hors de la boutique.
+   */
+  const journaliser = useCallback((role: "client" | "bot", message: string) => {
+    if (typeof window === "undefined" || window.parent === window) return;
+    const texte = message.trim();
+    if (!texte) return;
+    window.parent.postMessage(
+      { source: SOURCE_CHAT, type: "journaliser", role, message: texte.slice(0, 1200) },
+      origineHote.current ?? "*",
+    );
+  }, []);
+
   /** Le chat est-il ouvert depuis la boutique, ou consulté en direct ? */
   const embarque = typeof window !== "undefined" && window.parent !== window;
 
@@ -247,6 +261,7 @@ export function usePanierHote() {
     page,
     questionInitiale,
     effacerQuestion,
+    journaliser,
     etats,
     messages,
     ajouter,

@@ -140,6 +140,7 @@ function ChatPage() {
     // Bulle assistant vide : elle se remplit au fil du flux.
     setMessages([...historique, { role: "assistant", content: "" }]);
     setEnCours(true);
+    panier.journaliser("client", contenu);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -179,6 +180,7 @@ function ChatPage() {
 
     setEnCours(false);
     abortRef.current = null;
+    if (accumule) panier.journaliser("bot", accumule);
     champRef.current?.focus();
   }
 
