@@ -37,6 +37,8 @@ export type ModeleFormulaire = {
   champs: ChampFormulaire[];
   bouton: string;
   note?: string;
+  /** Ce qui remplace les cases une fois la réponse partie. */
+  confirmation: string;
   /** Phrase renvoyée à O'Buddy une fois le formulaire validé. */
   resume: (valeurs: Record<string, string>) => string;
 };
@@ -66,6 +68,7 @@ export const FORMULAIRES: Record<string, ModeleFormulaire> = {
     ],
     bouton: "VOIR MA COMMANDE",
     note: "La référence figure sur ton email de confirmation.",
+    confirmation: "Référence et email transmis.",
     resume: (v) =>
       `Suivi de commande — référence : ${v.reference}, email : ${v.email}`,
   },
@@ -116,6 +119,7 @@ export const FORMULAIRES: Record<string, ModeleFormulaire> = {
     ],
     bouton: "PRÉPARER MA DEMANDE",
     note: "Tu valides le récapitulatif avant le moindre envoi.",
+    confirmation: "Infos transmises.",
     resume: (v) =>
       [
         `Demande de compte pro — nom : ${v.nom}`,

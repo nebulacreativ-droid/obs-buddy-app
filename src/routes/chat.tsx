@@ -488,6 +488,7 @@ function FormulaireInline({
   // Les erreurs n'apparaissent qu'après une tentative : signaler "il manque ça"
   // avant même la première frappe, c'est reprocher au visiteur d'arriver.
   const [tente, setTente] = useState(false);
+  const [envoye, setEnvoye] = useState(false);
 
   const erreurs = erreursFormulaire(modele, valeurs);
 
@@ -496,7 +497,20 @@ function FormulaireInline({
       setTente(true);
       return;
     }
+    setEnvoye(true);
     onEnvoyer(modele.resume(valeurs));
+  }
+
+  // Une fois parti, le contenu est repris juste en dessous dans la bulle du
+  // visiteur : garder les cases remplies à l'écran ne ferait que doubler le
+  // défilement. On note simplement que c'est fait.
+  if (envoye) {
+    return (
+      <div className="flex items-center gap-1.5 rounded-2xl border border-ink/12 bg-paper px-3.5 py-2.5 text-xs text-ink/60">
+        <Check className="h-3.5 w-3.5 shrink-0" />
+        {modele.confirmation}
+      </div>
+    );
   }
 
   return (
