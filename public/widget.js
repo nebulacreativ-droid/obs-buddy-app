@@ -30,19 +30,110 @@
   var NOIR = "#0F0F0F";
   var Z = 2147483000;
 
-  // Délais avant proposition spontanée. Bien plus court sur une fiche produit :
-  // le visiteur y hésite déjà, l'attendre au clic fait perdre la vente.
-  var DELAI_FICHE_MS = 12000;
-  var DELAI_AUTRE_MS = 50000;
-  var CLE_INVITE = "obsbuddy-invite-vue";
+  // Délais avant proposition. Court : les questions doivent sortir d'elles-mêmes,
+  // sinon le visiteur a déjà quitté la page — ou cliqué ailleurs.
+  var DELAI_FICHE_MS = 3500;
+  var DELAI_AUTRE_MS = 6000;
+  // Mémoire par TYPE de page, pas globale : avoir refusé les questions sur une
+  // fiche produit ne doit pas priver le visiteur du suivi de commande en
+  // arrivant sur l'accueil. Clé neuve : l'ancienne valeur globale ne bloque plus.
+  var CLE_PROPOSE = "obsbuddy-propose";
   var CLE_SESSION = "obsbuddy-session";
 
-  // Les trois questions qui reviennent devant une fiche produit.
-  var QUESTIONS_PRODUIT = [
-    "C'est fait pour moi ?",
-    "Comment je l'utilise ?",
-    "Tu as une alternative ?",
+  /**
+   * Ce qu'on propose selon la page. Une question utile devant une fiche
+   * produit ne l'est pas sur la page panier : proposer au hasard, c'est
+   * n'être utile nulle part.
+   */
+  var PROPOSITIONS = {
+    product: {
+      titre: "Une question sur ce produit ?",
+      questions: ["C'est fait pour moi ?", "Comment je l'utilise ?", "Tu as une alternative ?"],
+    },
+    "product-search": {
+      titre: "Tu cherches quelque chose ?",
+      questions: ["Décris-moi ce qu'il te faut", "Vos meilleures ventes ?", "Je suis professionnel"],
+    },
+    "best-sales": {
+      titre: "Je t'aide à choisir ?",
+      questions: ["Le plus vendu, c'est quoi ?", "Lequel me conviendrait ?", "Je suis professionnel"],
+    },
+    manufacturer: {
+      titre: "Une question sur cette marque ?",
+      questions: ["Elle vaut quoi ?", "Quel produit prendre ?", "Une marque équivalente ?"],
+    },
+    category: {
+      titre: "Je t'aide à choisir ?",
+      questions: ["Lequel me conviendrait ?", "C'est quoi la différence ?", "Vos meilleures ventes ?"],
+    },
+    cart: {
+      titre: "Avant de valider…",
+      questions: ["Il me manque quelque chose ?", "La livraison est offerte ?"],
+    },
+    order: {
+      titre: "Un doute sur ta commande ?",
+      questions: ["Quels moyens de paiement ?", "Sous combien de temps ?"],
+    },
+    index: {
+      titre: "Salut, je peux t'aider ?",
+      questions: ["Où en est ma commande ?", "Conseille-moi un produit", "Je veux devenir client pro"],
+    },
+    defaut: {
+      titre: "Besoin d'un coup de main ?",
+      questions: ["Suivre ma commande", "Un conseil produit", "Je suis professionnel"],
+    },
+  };
+
+  /**
+   * Devant une tondeuse et devant une pommade, ce ne sont pas les mêmes
+   * questions. On les déduit du nom du produit : c'est la seule information
+   * disponible sans appeler la boutique, et elle suffit.
+   */
+  var FAMILLES_PRODUIT = [
+    {
+      motif: /tondeuse|clipper|trimmer|finition|rasoir|shaver|ciseau|scissor|seche|cheveux electrique|peigne|brosse|blade|lame|foil|chargeur|sabot/,
+      titre: "Une question sur ce matériel ?",
+      questions: ["C'est fait pour quel usage ?", "Quelle autonomie ?", "Tu as un équivalent ?"],
+    },
+    {
+      motif: /parfum|eau de toilette|cologne|fragrance|after ?shave|apres rasage/,
+      titre: "Une question sur ce parfum ?",
+      questions: ["Ça sent quoi ?", "Ça tient longtemps ?", "Tu as une alternative ?"],
+    },
+    {
+      motif: /barbe|beard|moustache|baume|balm/,
+      titre: "Une question sur ce produit barbe ?",
+      questions: ["C'est pour quel type de barbe ?", "Comment je l'applique ?", "Tu as une alternative ?"],
+    },
+    {
+      motif: /shampo|shampoo|conditioner|apres-shampo|tonic|serum|masque|soin/,
+      titre: "Une question sur ce soin ?",
+      questions: ["C'est pour quel type de cheveux ?", "Je l'utilise combien de fois ?", "Tu as une alternative ?"],
+    },
+    {
+      motif: /pommade|pomade|cire|wax|gomme|clay|argile|poudre|powder|gel|paste|fibre|gomina|spray|laque/,
+      titre: "Une question sur ce coiffant ?",
+      questions: ["Quelle tenue ça donne ?", "C'est fait pour mes cheveux ?", "Comment je l'applique ?"],
+    },
   ];
+
+  /** Minuscules sans accents : "Sèche-cheveux" doit matcher "seche". */
+  function aplatir(texte) {
+    return String(texte || "")
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "");
+  }
+
+  function jeuPourPage(contexte) {
+    if (contexte.type === "product" && contexte.titre) {
+      var nom = aplatir(contexte.titre);
+      for (var i = 0; i < FAMILLES_PRODUIT.length; i++) {
+        if (FAMILLES_PRODUIT[i].motif.test(nom)) return FAMILLES_PRODUIT[i];
+      }
+    }
+    return PROPOSITIONS[contexte.type] || PROPOSITIONS.defaut;
+  }
 
   var styles =
     "" +
@@ -58,23 +149,7 @@
     ".obsbuddy-pastille{position:absolute;top:-2px;right:-2px;width:14px;height:14px;" +
     "border-radius:50%;background:" + NOIR + ";border:2px solid " + JAUNE + "}" +
 
-    // ── Invitation spontanée ──────────────────────────────────────────────
-    ".obsbuddy-invite{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
-    "max-width:270px;background:#fff;color:" + NOIR + ";border:1px solid rgba(15,15,15,.1);" +
-    "border-radius:18px;padding:13px 36px 13px 16px;cursor:pointer;text-align:left;" +
-    "box-shadow:0 10px 30px rgba(15,15,15,.16);font:500 13px/1.45 'Montserrat',system-ui,sans-serif;" +
-    "opacity:0;transform:translateY(8px);pointer-events:none;" +
-    "transition:opacity .25s ease,transform .25s ease}" +
-    ".obsbuddy-invite.obsbuddy-visible{opacity:1;transform:none;pointer-events:auto}" +
-    ".obsbuddy-invite strong{display:block;font-weight:700;margin-bottom:2px}" +
-    ".obsbuddy-invite-produit{display:block;margin-top:6px;font-size:12px;color:#555;" +
-    "white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
-    ".obsbuddy-invite-fermer{position:absolute;top:6px;right:6px;width:22px;height:22px;" +
-    "border:0;background:transparent;color:#888;cursor:pointer;font-size:16px;line-height:1;" +
-    "padding:0;border-radius:4px}" +
-    ".obsbuddy-invite-fermer:hover{background:#eee;color:" + NOIR + "}" +
-
-    // ── Questions posées d'emblée sur une fiche produit ───────────────────
+    // ── Questions posées d'emblée, adaptées à la page ─────────────────────
     ".obsbuddy-questions{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
     "display:flex;flex-direction:column;align-items:flex-end;gap:7px;max-width:300px;" +
     "opacity:0;transform:translateY(8px);pointer-events:none;" +
@@ -119,11 +194,10 @@
     "@media (max-width:520px){" +
     ".obsbuddy-panneau{width:100vw;border-radius:0}" +
     ".obsbuddy-lanceur{right:16px;bottom:16px;width:54px;height:54px}" +
-    ".obsbuddy-invite{right:16px;bottom:82px;max-width:calc(100vw - 32px)}" +
     ".obsbuddy-questions{right:16px;bottom:82px;max-width:calc(100vw - 32px)}}" +
 
     "@media (prefers-reduced-motion:reduce){" +
-    ".obsbuddy-invite,.obsbuddy-questions,.obsbuddy-panneau,.obsbuddy-lanceur," +
+    ".obsbuddy-questions,.obsbuddy-panneau,.obsbuddy-lanceur," +
     ".obsbuddy-q{transition:none}}";
 
   var feuille = document.createElement("style");
@@ -267,31 +341,42 @@
     return contexte;
   }
 
-  // ── Invitation spontanée ───────────────────────────────────────────────
-  // Une bulle discrète, jamais une ouverture forcée du panneau : proposer
-  // sans s'imposer. Une seule fois par session, et plus jamais si le
-  // visiteur la ferme ou ouvre le chat de lui-même.
+  // ── Questions proposées ────────────────────────────────────────────────
+  // Deux ou trois questions posées d'emblée, jamais une ouverture forcée du
+  // panneau : proposer sans s'imposer. Une seule fois par type de page, et
+  // plus jamais sur ce type si le visiteur les ferme ou ouvre le chat.
 
-  function invitationDejaVue() {
+  /** Type de page en cours : sert à ne mémoriser que celui-là. */
+  var typeCourant = "";
+
+  function typesProposes() {
     try {
-      return window.sessionStorage.getItem(CLE_INVITE) === "1";
+      return (window.sessionStorage.getItem(CLE_PROPOSE) || "").split(",");
     } catch (e) {
-      return false;
+      return [];
     }
   }
 
-  function marquerInvitationVue() {
+  function dejaPropose(type) {
+    return typesProposes().indexOf(type || "defaut") !== -1;
+  }
+
+  function marquerPropose(type) {
+    var cible = type || typeCourant || "defaut";
+    if (dejaPropose(cible)) return;
     try {
-      window.sessionStorage.setItem(CLE_INVITE, "1");
+      var liste = typesProposes().filter(Boolean);
+      liste.push(cible);
+      window.sessionStorage.setItem(CLE_PROPOSE, liste.join(","));
     } catch (e) {
-      /* stockage refusé : l'invitation réapparaîtra au prochain chargement */
+      /* stockage refusé : les questions réapparaîtront au prochain chargement */
     }
   }
 
   function masquerInvite() {
     if (!invite) return;
     invite.classList.remove("obsbuddy-visible");
-    marquerInvitationVue();
+    marquerPropose(typeCourant);
     window.setTimeout(function () {
       if (invite && invite.parentNode) invite.parentNode.removeChild(invite);
       invite = null;
@@ -320,12 +405,14 @@
   }
 
   /**
-   * Sur une fiche produit, on ne se contente pas d'inviter : on pose déjà les
-   * questions. Le visiteur clique sur celle qui le concerne et le chat s'ouvre
-   * avec la réponse en route — un geste au lieu de trois.
+   * Propose deux ou trois questions adaptées à la page. Le visiteur clique sur
+   * celle qui le concerne et le chat s'ouvre avec la réponse en route — un
+   * geste au lieu de trois.
    */
   function afficherQuestions(contexte) {
-    if (ouvert || invite || invitationDejaVue()) return;
+    if (ouvert || invite || dejaPropose(contexte.type)) return;
+
+    var jeu = jeuPourPage(contexte);
 
     invite = document.createElement("div");
     invite.className = "obsbuddy-questions";
@@ -333,7 +420,7 @@
     var entete = document.createElement("div");
     entete.className = "obsbuddy-q-entete";
     entete.innerHTML =
-      "Une question sur ce produit ?" +
+      echapper(jeu.titre) +
       (contexte.titre
         ? '<span class="obsbuddy-q-produit">' + echapper(contexte.titre) + "</span>"
         : "") +
@@ -341,70 +428,19 @@
     entete.querySelector(".obsbuddy-q-fermer").addEventListener("click", masquerInvite);
     invite.appendChild(entete);
 
-    QUESTIONS_PRODUIT.forEach(function (question) {
+    jeu.questions.forEach(function (question) {
       var bouton = document.createElement("button");
       bouton.className = "obsbuddy-q";
       bouton.type = "button";
       bouton.textContent = question;
       bouton.addEventListener("click", function () {
-        marquerInvitationVue();
+        marquerPropose(contexte.type);
         ouvrirAvecQuestion(question);
       });
       invite.appendChild(bouton);
     });
 
     document.body.appendChild(invite);
-    void invite.offsetWidth;
-    invite.classList.add("obsbuddy-visible");
-  }
-
-  function afficherInvite(contexte) {
-    if (ouvert || invite || invitationDejaVue()) return;
-
-    if (contexte.type === "product") {
-      afficherQuestions(contexte);
-      return;
-    }
-
-    var titre = "Besoin d'un coup de main ?";
-    var corps = "Routine, matos, commande — demande-moi.";
-    var surFiche = false;
-
-    invite = document.createElement("div");
-    invite.className = "obsbuddy-invite";
-    invite.setAttribute("role", "button");
-    invite.setAttribute("tabindex", "0");
-    invite.setAttribute("aria-label", titre + " Ouvrir O'Buddy.");
-
-    var contenu = "<strong>" + titre + "</strong>" + corps;
-    if (surFiche && contexte.titre) {
-      contenu +=
-        '<span class="obsbuddy-invite-produit">' + echapper(contexte.titre) + "</span>";
-    }
-    invite.innerHTML =
-      contenu +
-      '<button class="obsbuddy-invite-fermer" type="button" aria-label="Fermer la proposition">&times;</button>';
-
-    invite.addEventListener("click", function (e) {
-      if (e.target && e.target.classList.contains("obsbuddy-invite-fermer")) {
-        e.stopPropagation();
-        masquerInvite();
-        return;
-      }
-      marquerInvitationVue();
-      basculer(true);
-    });
-
-    invite.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        marquerInvitationVue();
-        basculer(true);
-      }
-    });
-
-    document.body.appendChild(invite);
-    // Force un reflow pour que la transition d'apparition se joue.
     void invite.offsetWidth;
     invite.classList.add("obsbuddy-visible");
   }
@@ -416,22 +452,26 @@
   }
 
   function programmerInvite() {
-    if (invitationDejaVue()) return;
-
     var contexte = contextePage();
-    var delai = contexte.type === "product" ? DELAI_FICHE_MS : DELAI_AUTRE_MS;
+    typeCourant = contexte.type || "defaut";
+    if (dejaPropose(contexte.type)) return;
+
+    var delai =
+      contexte.type === "product" || contexte.type === "category"
+        ? DELAI_FICHE_MS
+        : DELAI_AUTRE_MS;
 
     var minuteur = window.setTimeout(function () {
-      afficherInvite(contexte);
+      afficherQuestions(contexte);
     }, delai);
 
     // Intention de sortie : le curseur remonte hors de la fenêtre. Sur mobile
     // l'événement n'existe pas, le délai reste le seul déclencheur.
     var surSortie = function (e) {
-      if (e.clientY > 0 || invitationDejaVue()) return;
+      if (e.clientY > 0 || dejaPropose(contexte.type)) return;
       document.removeEventListener("mouseout", surSortie);
       window.clearTimeout(minuteur);
-      afficherInvite(contexte);
+      afficherQuestions(contexte);
     };
     document.addEventListener("mouseout", surSortie);
   }
