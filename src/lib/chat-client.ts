@@ -137,6 +137,18 @@ export type MessageDecoupe = {
 };
 
 /**
+ * Le flux arrive par morceaux : "[[F", ":COM", "MANDE]]". Pendant une fraction
+ * de seconde, la fin du texte est donc un marqueur à moitié écrit — qu'on
+ * afficherait tel quel. On coupe la queue ouverte ; elle sera rendue
+ * correctement au fragment suivant.
+ */
+function masquerMarqueurPartiel(tail: string): string {
+  const ouverture = tail.lastIndexOf("[[");
+  if (ouverture === -1) return tail;
+  return tail.includes("]]", ouverture) ? tail : tail.slice(0, ouverture);
+}
+
+/**
  * Sépare le corps du message (texte + cartes produit) des propositions de
  * réponse. Les choix sont sortis du flux : ils se rendent en boutons, pas
  * en ligne dans la phrase.
@@ -187,7 +199,7 @@ export function decouperMessage(texte: string): MessageDecoupe {
   }
 
   if (curseur < texte.length) {
-    segments.push({ type: "texte", valeur: texte.slice(curseur) });
+    segments.push({ type: "texte", valeur: masquerMarqueurPartiel(texte.slice(curseur)) });
   }
   return { segments, choix: choix.slice(0, 5) };
 }

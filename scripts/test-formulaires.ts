@@ -81,5 +81,35 @@ verifier(
   "Demande de compte pro — nom : X ; email : a@b.fr ; téléphone : 0612345678 ; activité : À domicile ; besoin : Cires",
 );
 
+
+// ── Marqueur en cours de frappe ──────────────────────────────────────────
+// Le flux SSE découpe "[[F:COMMANDE]]" en sept morceaux : à chaque étape
+// intermédiaire, la fin du texte est un marqueur à moitié écrit.
+const etapes = ["Je regarde ça.", " [[", "F", ":", "COM", "MAN", "DE", "]]"];
+let accumule = "";
+const rendus: string[] = [];
+for (const morceau of etapes) {
+  accumule += morceau;
+  rendus.push(
+    decouperMessage(accumule)
+      .segments.filter((s) => s.type === "texte")
+      .map((s) => (s as { valeur: string }).valeur)
+      .join(""),
+  );
+}
+verifier(
+  "aucun marqueur à moitié écrit à l'écran",
+  rendus.filter((r) => r.includes("[[")),
+  [],
+);
+verifier("texte final propre", rendus[rendus.length - 1], "Je regarde ça. ");
+verifier(
+  "les crochets seuls restent du texte",
+  decouperMessage("Un tableau a[[i]] en C.")
+    .segments.map((s) => (s as { valeur?: string }).valeur ?? s.type)
+    .join(""),
+  "Un tableau a[[i]] en C.",
+);
+
 console.log(echecs ? `\n${echecs} échec(s)` : "\nTout passe.");
 process.exit(echecs ? 1 : 0);
