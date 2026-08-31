@@ -96,8 +96,16 @@ fin.writeUInt32LE(position, 16);
 
 const archive = Buffer.concat([...morceaux, corpsCentral, fin]);
 
+// Toutes les copies connues sont réécrites d'office : une archive périmée
+// oubliée dans un dossier finit toujours par être celle qu'on installe.
+const COPIES = [
+  "C:/Users/Younes OBS/OneDrive - OBARBERSHOP/Bureau/obsbuddy.zip",
+  "C:/Users/Younes OBS/Downloads/obsbuddy.zip",
+  "C:/Users/Younes OBS/Desktop/obsbuddy.zip",
+];
+
 const destinations = process.argv.slice(2);
-if (!destinations.length) destinations.push(join(RACINE, "..", "obsbuddy.zip"));
+if (!destinations.length) destinations.push(...COPIES);
 
 for (const dest of destinations) {
   if (!existsSync(dirname(dest))) {
