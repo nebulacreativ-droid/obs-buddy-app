@@ -57,6 +57,7 @@ const TAXONOMIE = moteur.taxonomie();
 const catalogueMarques = creerCatalogueMarques(
   lireJson<Marque[]>("marques.json"),
   lireJson<FicheCartographie[]>("brands-cartographie.json"),
+  CATALOGUE,
 );
 
 const SYSTEM_PROMPT = `Tu es O'Buddy, l'assistant barber d'O'Barbershop (${SITE_URL}).
@@ -131,6 +132,19 @@ l'email du compte. S'il ne t'a donné qu'un des deux, demande l'autre, une
 question à la fois. N'invente jamais un statut ni une date de livraison.
 Si rien ne correspond, ne dis pas lequel des deux éléments est faux : tu ne
 sais pas à qui tu parles, et le dire renseignerait un curieux.
+
+LES MARQUES — DEUX NATURES À NE JAMAIS MÉLANGER
+· Marques de MATÉRIEL : Wahl, Panasonic, StyleCraft, Andis, Babyliss PRO,
+  Gamma+, Kyone, Mashiro, YS Park… Elles équipent le barbier. On ne les
+  "met pas en rayon".
+· Marques de PRODUIT (revente) : Reuzel, Uppercut Deluxe, Layrite, Suavecito,
+  Clubman Pinaud, Bullfrog, Apothecary 87… Elles remplissent le mur de revente.
+Certaines font les deux (Reuzel, L3vel3, Proraso) : l'outil te le dit.
+Appelle toujours proposer_marques avec la bonne famille.
+
+Tu ne cites JAMAIS une marque de mémoire : seules celles que l'outil renvoie
+sont réellement distribuées. Une marque absente de ses résultats n'est plus
+vendue, même si tu la connais.
 
 RÈGLES ABSOLUES
 - Pour recommander un produit, tu DOIS d'abord appeler rechercher_produits.
@@ -300,10 +314,16 @@ const TOOLS: ChatCompletionTool[] = [
     function: {
       name: "proposer_marques",
       description:
-        "Propose des marques à mettre en rayon pour un barbershop en création. À utiliser dans le parcours ouverture de shop, une fois le style et le positionnement connus. L'interface affiche une sélection multiple : l'utilisateur coche celles qu'il retient.",
+        "Propose des marques réellement distribuées par O'Barbershop, classées par ventes réelles. L'interface affiche une sélection multiple : l'utilisateur coche celles qu'il retient. Précise toujours la famille : les marques de matériel (Wahl, Panasonic) et les marques de soin à revendre (Reuzel, Uppercut) ne répondent pas au même besoin.",
       parameters: {
         type: "object",
         properties: {
+          famille: {
+            type: "string",
+            enum: ["produit", "materiel", "toutes"],
+            description:
+              "produit = soins et coiffants à mettre en rayon (mur de revente). materiel = tondeuses, ciseaux, équipement du salon. Défaut : produit.",
+          },
           styles: {
             type: "array",
             items: { type: "string", enum: TAXONOMIE.styles },
@@ -451,7 +471,17 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
   }
 
   if (nom === "proposer_marques") {
+    // Le classement des marques suit les ventes réelles de la boutique, pas
+    // une appréciation figée. Cache de 30 min côté client PrestaShop.
+    const ventes = await idsMeilleuresVentes(200);
+    if (ventes) catalogueMarques.definirMeilleuresVentes(ventes);
+
+    const famille = args.famille === "materiel" || args.famille === "toutes"
+      ? (args.famille as "materiel" | "toutes")
+      : "produit";
+
     const marques = catalogueMarques.proposer({
+      famille,
       styles: Array.isArray(args.styles) ? (args.styles as string[]) : undefined,
       segment: Array.isArray(args.segment) ? (args.segment as string[]) : undefined,
       seulementBestSellers: args.seulementBestSellers === true,
@@ -470,7 +500,8 @@ async function executerOutil(nom: string, args: Record<string, unknown>) {
           nom: m.nom,
           pays: m.pays,
           segment: m.segment,
-          bestSeller: m.bestSeller,
+          famille: m.famille,
+          references: m.nbProduits,
         })),
       },
       pourLInterface: null,
