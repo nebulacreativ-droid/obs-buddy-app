@@ -194,16 +194,14 @@
     }
   });
 
+  // Le montage est déclenché tout en bas du fichier, une fois toutes les
+  // constantes assignées : les `var` sont hoistées mais pas leurs valeurs, et
+  // monter trop tôt lisait un tableau encore `undefined` — l'exception coupait
+  // alors le reste du script, dont l'écouteur de messages.
   function monter() {
     document.body.appendChild(panneau);
     document.body.appendChild(lanceur);
     programmerInvite();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", monter);
-  } else {
-    monter();
   }
 
   // ── Contexte de page ───────────────────────────────────────────────────
@@ -657,4 +655,11 @@
     },
     basculer: basculer,
   };
+
+  // Dernière instruction du script : à ce point, tout est déclaré et assigné.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", monter);
+  } else {
+    monter();
+  }
 })();
