@@ -215,7 +215,7 @@ function ChatPage() {
             <div className="font-display text-lg tracking-wide text-gold">
               O'BUDDY
             </div>
-            <div className="mt-0.5 text-[10px] font-medium tracking-[0.14em] text-paper/55">
+            <div className="mt-0.5 text-[11px] font-medium tracking-[0.14em] text-paper/55">
               SHOP ASSISTANT
             </div>
           </div>
@@ -247,7 +247,7 @@ function ChatPage() {
       <div className="flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
           <Bulle role="assistant">
-            <p className="text-sm leading-relaxed">{ACCUEIL}</p>
+            <p className="text-[15px] leading-relaxed">{ACCUEIL}</p>
           </Bulle>
 
           {vide && panier.page?.type === "product" && panier.page.titre && (
@@ -260,7 +260,7 @@ function ChatPage() {
                 <button
                   key={p.numero}
                   onClick={() => envoyer(p.message)}
-                  className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-xs font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
+                  className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-[13px] font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
                 >
                   {p.titre}
                 </button>
@@ -273,7 +273,7 @@ function ChatPage() {
             if (m.role === "user") {
               return (
                 <Bulle key={i} role="user">
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                  <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
                     {m.content}
                   </p>
                 </Bulle>
@@ -304,7 +304,7 @@ function ChatPage() {
           })}
 
           {erreur && (
-            <div className="rounded-xl border border-[var(--rouge)]/40 bg-[var(--rouge)]/5 px-3.5 py-2.5 text-xs text-[var(--rouge)]">
+            <div className="rounded-xl border border-[var(--rouge)]/40 bg-[var(--rouge)]/5 px-3.5 py-2.5 text-[13px] text-[var(--rouge)]">
               {erreur}
             </div>
           )}
@@ -328,7 +328,7 @@ function ChatPage() {
             }}
             placeholder="Pose ta question…"
             disabled={enCours}
-            className="max-h-32 flex-1 resize-none rounded-2xl border border-ink/15 bg-paper px-4 py-3 text-sm outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.45)] disabled:opacity-60"
+            className="max-h-32 flex-1 resize-none rounded-2xl border border-ink/15 bg-paper px-4 py-3 text-[15px] outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.45)] disabled:opacity-60"
           />
           <button
             onClick={() => envoyer(saisie)}
@@ -339,7 +339,7 @@ function ChatPage() {
             <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
           </button>
         </div>
-        <p className="mx-auto mt-2 max-w-2xl text-center text-[10px] text-ink/50">
+        <p className="mx-auto mt-2 max-w-2xl text-center text-[11px] text-ink/50">
           O'Buddy peut se tromper — vérifie les infos importantes sur obarbershop.com
         </p>
       </div>
@@ -358,7 +358,7 @@ function Bulle({
   return (
     <div className={`flex ${utilisateur ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[88%] px-4 py-3 text-[13.5px] ${
+        className={`max-w-[88%] px-4 py-3 text-[14.5px] ${
           utilisateur
             ? "rounded-[18px_18px_5px_18px] bg-ink text-gold"
             : "rounded-[18px_18px_18px_5px] border border-ink/10 bg-paper text-ink shadow-[0_2px_10px_rgba(15,15,15,.05)]"
@@ -398,7 +398,7 @@ function ContenuAssistant({
           const valeur = s.valeur.trim();
           if (!valeur) return null;
           return (
-            <p key={i} className="text-sm leading-relaxed whitespace-pre-wrap">
+            <p key={i} className="text-[15px] leading-relaxed whitespace-pre-wrap">
               <TexteFormate valeur={valeur} />
             </p>
           );
@@ -450,13 +450,19 @@ function ContenuAssistant({
         return <CarteProduit key={i} produit={produit} panier={panier} />;
       })}
 
+      {/*
+        Une proposition par ligne. En pastilles côte à côte, les libellés se
+        coupaient en fin de ligne et l'œil devait chercher où commençait la
+        suivante ; empilées, elles se lisent comme une liste de réponses et
+        offrent chacune une cible pleine largeur.
+      */}
       {actif && choix.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1.5">
+        <div className="mt-1.5 flex flex-col items-stretch gap-1.5">
           {choix.map((c) => (
             <button
               key={c}
               onClick={() => onChoix(c)}
-              className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-xs font-medium text-ink transition hover:border-ink hover:bg-ink hover:text-gold"
+              className="tap-target rounded-2xl border border-ink/15 bg-paper px-4 py-2.5 text-left text-[13px] font-medium text-ink transition hover:border-ink hover:bg-ink hover:text-gold"
             >
               {c}
             </button>
@@ -506,7 +512,7 @@ function FormulaireInline({
   // défilement. On note simplement que c'est fait.
   if (envoye) {
     return (
-      <div className="flex items-center gap-1.5 rounded-2xl border border-ink/12 bg-paper px-3.5 py-2.5 text-xs text-ink/60">
+      <div className="flex items-center gap-1.5 rounded-2xl border border-ink/12 bg-paper px-3.5 py-2.5 text-[13px] text-ink/60">
         <Check className="h-3.5 w-3.5 shrink-0" />
         {modele.confirmation}
       </div>
@@ -515,10 +521,10 @@ function FormulaireInline({
 
   return (
     <div className="rounded-2xl border border-ink/12 bg-paper p-3.5">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
         {modele.titre}
       </div>
-      <p className="mb-2.5 text-xs text-ink/70">{modele.intro}</p>
+      <p className="mb-2.5 text-[13px] text-ink/70">{modele.intro}</p>
 
       <div className="flex flex-col gap-2">
         {modele.champs.map((champ) => (
@@ -539,20 +545,20 @@ function FormulaireInline({
       <button
         onClick={valider}
         disabled={!actif}
-        className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-xs font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
+        className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-[13px] font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
       >
         {modele.bouton}
       </button>
 
       {modele.note && (
-        <p className="mt-1.5 text-[10px] text-ink/50">{modele.note}</p>
+        <p className="mt-1.5 text-[11px] text-ink/50">{modele.note}</p>
       )}
     </div>
   );
 }
 
 const CHAMP_BASE =
-  "w-full rounded-xl bg-paper px-3 py-2.5 text-sm outline-none transition " +
+  "w-full rounded-xl bg-paper px-3 py-2.5 text-[15px] outline-none transition " +
   "placeholder:text-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60";
 
 function ChampFormulaireInline({
@@ -575,10 +581,10 @@ function ChampFormulaireInline({
     : "border border-ink/15 focus:border-ink/35";
 
   const intitule = (
-    <span className="text-[11px] font-medium text-ink/60">{champ.libelle}</span>
+    <span className="text-[12px] font-medium text-ink/60">{champ.libelle}</span>
   );
   const message = erreur ? (
-    <span className="text-[11px] text-[var(--rouge)]">{erreur}</span>
+    <span className="text-[12px] text-[var(--rouge)]">{erreur}</span>
   ) : null;
 
   // Une pastille cochée se déselectionne d'un second appui : c'est facultatif,
@@ -597,7 +603,7 @@ function ChampFormulaireInline({
                 disabled={!actif}
                 aria-pressed={choisi}
                 onClick={() => onChange(choisi ? "" : option)}
-                className={`tap-target rounded-full border px-3 py-1.5 text-xs font-medium transition disabled:opacity-60 ${
+                className={`tap-target rounded-full border px-3 py-1.5 text-[13px] font-medium transition disabled:opacity-60 ${
                   choisi
                     ? "border-ink bg-ink text-gold"
                     : "border-ink/15 text-ink hover:border-ink/40"
@@ -699,7 +705,7 @@ function SelecteurMarques({
 
   return (
     <div className="rounded-2xl border border-ink/12 bg-paper p-3">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
         COCHE TES MARQUES
       </div>
 
@@ -728,11 +734,11 @@ function SelecteurMarques({
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-medium leading-tight">
+                <div className="truncate text-[13px] font-medium leading-tight">
                   {m.nom}
                 </div>
                 <div
-                  className={`truncate text-[10px] ${active ? "text-gold/70" : "text-ink/50"}`}
+                  className={`truncate text-[11px] ${active ? "text-gold/70" : "text-ink/50"}`}
                 >
                   {/* L'univers de la marque explique pourquoi elle est proposée. */}
                   {m.styles.slice(0, 2).map(libelleStyle).join(" · ") || m.pays}
@@ -749,7 +755,7 @@ function SelecteurMarques({
         <button
           onClick={valider}
           disabled={!choisies.length}
-          className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-xs font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
+          className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-[13px] font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
         >
           VALIDER {choisies.length > 0 && `(${choisies.length})`}
         </button>
@@ -772,7 +778,7 @@ function BlocFidelite({ panier }: { panier: ReturnType<typeof usePanierHote> }) 
 
   return (
     <div className="rounded-2xl border border-ink/12 bg-paper p-3.5">
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
         FIDÉLITÉ
       </div>
 
@@ -784,14 +790,14 @@ function BlocFidelite({ panier }: { panier: ReturnType<typeof usePanierHote> }) 
         <>
           {fidelite.paliers.length ? (
             <>
-              <div className="text-xs text-ink/60">
+              <div className="text-[13px] text-ink/60">
                 {fidelite.prenom ? `${fidelite.prenom}, ton palier` : "Ton palier"}
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {fidelite.paliers.map((p) => (
                   <span
                     key={p}
-                    className="bg-gold px-2 py-0.5 font-display text-sm tracking-wide text-ink"
+                    className="bg-gold px-2 py-0.5 font-display text-[15px] tracking-wide text-ink"
                   >
                     {p.toUpperCase()}
                   </span>
@@ -799,7 +805,7 @@ function BlocFidelite({ panier }: { panier: ReturnType<typeof usePanierHote> }) 
               </div>
             </>
           ) : (
-            <p className="text-sm leading-relaxed">
+            <p className="text-[15px] leading-relaxed">
               Tu es bien connecté, mais aucun palier de fidélité n'est encore
               associé à ton compte.
             </p>
@@ -808,14 +814,14 @@ function BlocFidelite({ panier }: { panier: ReturnType<typeof usePanierHote> }) 
       )}
 
       {fidelite.etat === "deconnecte" && (
-        <p className="text-sm leading-relaxed">
+        <p className="text-[15px] leading-relaxed">
           Connecte-toi sur obarbershop.com pour voir ton palier — je ne peux pas
           y accéder autrement, c'est ce qui protège ton compte.
         </p>
       )}
 
       {fidelite.etat === "indisponible" && (
-        <p className="text-sm leading-relaxed">
+        <p className="text-[15px] leading-relaxed">
           Je n'arrive pas à récupérer ton palier depuis ici. Tu le retrouves dans
           ton compte sur obarbershop.com.
         </p>
@@ -853,11 +859,11 @@ function RecapDemandePro({
 
   return (
     <div className="rounded-2xl border border-ink/12 bg-paper p-3.5">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+      <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
         DEMANDE DE COMPTE PRO
       </div>
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[13px]">
         {lignes.map(([libelle, valeur]) =>
           valeur ? (
             <div key={libelle} className="contents">
@@ -869,13 +875,13 @@ function RecapDemandePro({
       </dl>
 
       {demande.message && (
-        <p className="mt-2 border-t border-ink/15 pt-2 text-xs text-ink/70">
+        <p className="mt-2 border-t border-ink/15 pt-2 text-[13px] text-ink/70">
           {demande.message}
         </p>
       )}
 
       {envoiPro.etat === "ok" ? (
-        <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-ink px-3 py-2.5 text-xs font-semibold text-gold">
+        <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-ink px-3 py-2.5 text-[13px] font-semibold text-gold">
           <Check className="h-3.5 w-3.5" /> DEMANDE ENVOYÉE
         </div>
       ) : (
@@ -883,18 +889,18 @@ function RecapDemandePro({
           <button
             onClick={() => envoyerDemandePro({ ...demande })}
             disabled={!actif || envoiPro.etat === "envoi"}
-            className="tap-target mt-3 w-full rounded-xl bg-gold px-3 py-2.5 text-xs font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
+            className="tap-target mt-3 w-full rounded-xl bg-gold px-3 py-2.5 text-[13px] font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
           >
             {envoiPro.etat === "envoi" ? "ENVOI…" : "ENVOYER MA DEMANDE"}
           </button>
-          <p className="mt-1.5 text-[10px] text-ink/50">
+          <p className="mt-1.5 text-[11px] text-ink/50">
             Ces informations partent à l'équipe O'Barbershop, qui te recontacte.
           </p>
         </>
       )}
 
       {envoiPro.etat === "erreur" && (
-        <p className="mt-1.5 text-[11px] text-[var(--rouge)]">{envoiPro.message}</p>
+        <p className="mt-1.5 text-[12px] text-[var(--rouge)]">{envoiPro.message}</p>
       )}
     </div>
   );
@@ -916,29 +922,29 @@ function BandeauProduit({
       <div className="flex items-start gap-2">
         <Eye className="mt-0.5 h-4 w-4 shrink-0" />
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
             TU REGARDES
           </div>
-          <div className="mt-0.5 text-sm font-medium leading-tight">{titre}</div>
+          <div className="mt-0.5 text-[15px] font-medium leading-tight">{titre}</div>
         </div>
       </div>
 
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <button
           onClick={() => onDemander("Ce produit est fait pour moi ?")}
-          className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-xs font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
+          className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-[13px] font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
         >
           C'est fait pour moi ?
         </button>
         <button
           onClick={() => onDemander("Comment on l'utilise, ce produit ?")}
-          className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-xs font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
+          className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-[13px] font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
         >
           Comment l'utiliser ?
         </button>
         <button
           onClick={() => onDemander("Tu as mieux, ou un équivalent moins cher ?")}
-          className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-xs font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
+          className="tap-target rounded-full border border-ink/15 bg-paper px-3.5 py-2 text-[13px] font-medium transition hover:border-ink hover:bg-ink hover:text-gold"
         >
           Une alternative ?
         </button>
@@ -979,10 +985,10 @@ function CarteConseiller({
   if (envoiEscalade.etat === "ok") {
     return (
       <div className="rounded-2xl border border-ink/12 bg-paper p-3.5">
-        <div className="flex items-center gap-1.5 rounded-xl bg-ink px-3 py-2.5 text-xs font-semibold text-gold">
+        <div className="flex items-center gap-1.5 rounded-xl bg-ink px-3 py-2.5 text-[13px] font-semibold text-gold">
           <Check className="h-3.5 w-3.5" /> TRANSMIS À L'ÉQUIPE
         </div>
-        <p className="mt-2 text-xs text-ink/70">
+        <p className="mt-2 text-[13px] text-ink/70">
           Un conseiller O'Barbershop reprend ton échange et te répond par email.
         </p>
       </div>
@@ -993,12 +999,12 @@ function CarteConseiller({
     <div className="rounded-2xl border border-ink/12 bg-paper p-3.5">
       <div className="mb-2 flex items-center gap-1.5">
         <Headset className="h-4 w-4" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
           PARLER À UN CONSEILLER
         </span>
       </div>
 
-      <p className="mb-2.5 text-xs text-ink/70">
+      <p className="mb-2.5 text-[13px] text-ink/70">
         Je transmets notre échange à l'équipe. Laisse-moi ton email pour qu'on te réponde.
       </p>
 
@@ -1009,7 +1015,7 @@ function CarteConseiller({
           onChange={(e) => setEmail(e.target.value)}
           disabled={verrouille}
           placeholder="ton@email.com"
-          className="rounded-xl border border-ink/15 bg-paper px-3 py-2.5 text-sm outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60"
+          className="rounded-xl border border-ink/15 bg-paper px-3 py-2.5 text-[15px] outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60"
         />
         <input
           type="text"
@@ -1017,7 +1023,7 @@ function CarteConseiller({
           onChange={(e) => setNom(e.target.value)}
           disabled={verrouille}
           placeholder="Ton nom (facultatif)"
-          className="rounded-xl border border-ink/15 bg-paper px-3 py-2.5 text-sm outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60"
+          className="rounded-xl border border-ink/15 bg-paper px-3 py-2.5 text-[15px] outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60"
         />
         <textarea
           rows={2}
@@ -1025,7 +1031,7 @@ function CarteConseiller({
           onChange={(e) => setPrecision(e.target.value)}
           disabled={verrouille}
           placeholder="Une précision à ajouter ? (facultatif)"
-          className="resize-none rounded-xl border border-ink/15 bg-paper px-3 py-2.5 text-sm outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60"
+          className="resize-none rounded-xl border border-ink/15 bg-paper px-3 py-2.5 text-[15px] outline-none transition placeholder:text-ink/35 focus:border-ink/35 focus:shadow-[0_0_0_3px_rgba(252,242,79,.4)] disabled:opacity-60"
         />
       </div>
 
@@ -1040,17 +1046,17 @@ function CarteConseiller({
           })
         }
         disabled={verrouille || !emailValide}
-        className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-xs font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
+        className="tap-target mt-2.5 w-full rounded-xl bg-gold px-3 py-2.5 text-[13px] font-semibold text-ink transition hover:brightness-105 disabled:opacity-40"
       >
         {envoiEscalade.etat === "envoi" ? "ENVOI…" : "DEMANDER UN CONSEILLER"}
       </button>
 
-      <p className="mt-1.5 text-[10px] text-ink/50">
+      <p className="mt-1.5 text-[11px] text-ink/50">
         Les derniers messages de notre échange seront joints.
       </p>
 
       {envoiEscalade.etat === "erreur" && (
-        <p className="mt-1.5 text-[11px] text-[var(--rouge)]">{envoiEscalade.message}</p>
+        <p className="mt-1.5 text-[12px] text-[var(--rouge)]">{envoiEscalade.message}</p>
       )}
     </div>
   );
@@ -1059,7 +1065,7 @@ function CarteConseiller({
 function BlocRendezVous() {
   return (
     <div className="rounded-2xl border border-ink/12 bg-paper p-3">
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink/45">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-ink/45">
         RENDEZ-VOUS CONSEILLER
       </div>
       <BookingWidget />
@@ -1123,16 +1129,16 @@ function CarteProduit({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink/45">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/45">
             {produit.marque.toUpperCase()}
           </div>
-          <div className="text-sm font-medium leading-tight">{produit.nom}</div>
+          <div className="text-[15px] font-medium leading-tight">{produit.nom}</div>
           <div className="mt-1 flex items-center gap-2">
             <span className="rounded-md bg-gold px-2 py-0.5 font-display text-base leading-tight">
               {produit.prix_aff} €
             </span>
             {enRupture && (
-              <span className="font-display text-[10px] tracking-[0.2em] text-[var(--rouge)]">
+              <span className="font-display text-[11px] tracking-[0.2em] text-[var(--rouge)]">
                 RUPTURE
               </span>
             )}
@@ -1145,7 +1151,7 @@ function CarteProduit({
         <button
           onClick={() => panier.ajouter(produit.id)}
           disabled={etat === "envoi" || etat === "ok"}
-          className={`tap-target flex w-full items-center justify-center gap-1.5 border-t border-ink/10 px-3 py-2.5 text-xs font-semibold transition ${
+          className={`tap-target flex w-full items-center justify-center gap-1.5 border-t border-ink/10 px-3 py-2.5 text-[13px] font-semibold transition ${
             etat === "ok" ? "bg-ink text-gold" : "bg-gold text-ink hover:brightness-105"
           } disabled:cursor-default`}
         >
@@ -1164,14 +1170,14 @@ function CarteProduit({
       )}
 
       {etat === "erreur" && (
-        <p className="border-t border-ink/10 px-3 py-2 text-[11px] text-[var(--rouge)]">
+        <p className="border-t border-ink/10 px-3 py-2 text-[12px] text-[var(--rouge)]">
           {panier.messages[produit.id] ??
             "Ajout impossible. Ouvre la fiche produit pour commander."}
         </p>
       )}
 
       {panier.disponible && produit.declinaisons && !enRupture && (
-        <p className="border-t border-ink/10 px-3 py-2 text-[11px] text-ink/60">
+        <p className="border-t border-ink/10 px-3 py-2 text-[12px] text-ink/60">
           Plusieurs versions — choisis la tienne sur la fiche produit.
         </p>
       )}
