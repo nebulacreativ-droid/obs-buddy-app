@@ -48,7 +48,7 @@
     ".obsbuddy-lanceur{position:fixed;right:20px;bottom:20px;z-index:" + Z + ";" +
     "width:60px;height:60px;border-radius:50%;border:0;cursor:pointer;" +
     "background:" + JAUNE + ";color:" + NOIR + ";display:flex;align-items:center;justify-content:center;" +
-    "box-shadow:0 6px 24px rgba(0,0,0,.28);transition:transform .2s ease,box-shadow .2s ease;" +
+    "box-shadow:0 8px 26px rgba(15,15,15,.22);transition:transform .2s ease,box-shadow .2s ease;" +
     "padding:0;margin:0;line-height:0}" +
     ".obsbuddy-lanceur:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.34)}" +
     ".obsbuddy-lanceur:focus-visible{outline:3px solid " + NOIR + ";outline-offset:3px}" +
@@ -59,9 +59,9 @@
 
     // ── Invitation spontanée ──────────────────────────────────────────────
     ".obsbuddy-invite{position:fixed;right:20px;bottom:92px;z-index:" + Z + ";" +
-    "max-width:270px;background:#fff;color:" + NOIR + ";border:2px solid " + NOIR + ";" +
-    "border-radius:10px;padding:12px 34px 12px 14px;cursor:pointer;text-align:left;" +
-    "box-shadow:6px 6px 0 0 " + JAUNE + ";font:500 13px/1.45 'Montserrat',system-ui,sans-serif;" +
+    "max-width:270px;background:#fff;color:" + NOIR + ";border:1px solid rgba(15,15,15,.1);" +
+    "border-radius:18px;padding:13px 36px 13px 16px;cursor:pointer;text-align:left;" +
+    "box-shadow:0 10px 30px rgba(15,15,15,.16);font:500 13px/1.45 'Montserrat',system-ui,sans-serif;" +
     "opacity:0;transform:translateY(8px);pointer-events:none;" +
     "transition:opacity .25s ease,transform .25s ease}" +
     ".obsbuddy-invite.obsbuddy-visible{opacity:1;transform:none;pointer-events:auto}" +
@@ -81,7 +81,7 @@
     ".obsbuddy-questions.obsbuddy-visible{opacity:1;transform:none;pointer-events:auto}" +
 
     ".obsbuddy-q-entete{position:relative;background:" + NOIR + ";color:" + JAUNE + ";" +
-    "border-radius:10px 10px 4px 10px;padding:10px 34px 10px 13px;max-width:100%;" +
+    "border-radius:18px 18px 5px 18px;padding:11px 36px 11px 15px;max-width:100%;" +
     "font:700 12.5px/1.4 'Montserrat',system-ui,sans-serif;text-align:left;" +
     "box-shadow:0 6px 20px rgba(0,0,0,.22)}" +
     ".obsbuddy-q-produit{display:block;margin-top:3px;font-weight:500;font-size:11.5px;" +
@@ -91,12 +91,12 @@
     "font-size:16px;line-height:1;padding:0;border-radius:4px}" +
     ".obsbuddy-q-fermer:hover{background:rgba(255,255,255,.15);color:#fff}" +
 
-    ".obsbuddy-q{background:#fff;color:" + NOIR + ";border:2px solid " + NOIR + ";" +
-    "border-radius:10px;padding:8px 12px;cursor:pointer;text-align:right;" +
+    ".obsbuddy-q{background:#fff;color:" + NOIR + ";border:1px solid rgba(15,15,15,.12);" +
+    "border-radius:20px;padding:9px 15px;cursor:pointer;text-align:right;" +
     "font:500 13px/1.3 'Montserrat',system-ui,sans-serif;" +
-    "box-shadow:3px 3px 0 0 " + JAUNE + ";" +
+    "box-shadow:0 3px 12px rgba(15,15,15,.09);" +
     "transition:background .15s ease,color .15s ease,transform .15s ease}" +
-    ".obsbuddy-q:hover{background:" + NOIR + ";color:" + JAUNE + ";transform:translateX(-2px)}" +
+    ".obsbuddy-q:hover{background:" + NOIR + ";color:" + JAUNE + ";transform:translateX(-3px);box-shadow:0 5px 16px rgba(15,15,15,.18)}" +
     ".obsbuddy-q:focus-visible{outline:3px solid " + JAUNE + ";outline-offset:2px}" +
 
     // Panneau latéral ancré au bord droit, pleine hauteur : le visiteur garde
@@ -104,7 +104,7 @@
     // plutôt que d'apparaître, ce qui rend l'ouverture lisible.
     ".obsbuddy-panneau{position:fixed;right:0;top:0;bottom:0;z-index:" + Z + ";" +
     "width:min(420px,100vw);height:100dvh;border:0;overflow:hidden;" +
-    "border-radius:16px 0 0 16px;background:#fff;" +
+    "border-radius:22px 0 0 22px;background:#fff;" +
     "box-shadow:-14px 0 44px rgba(0,0,0,.24);" +
     "opacity:0;transform:translateX(100%);pointer-events:none;" +
     "transition:opacity .22s ease,transform .28s cubic-bezier(.22,.7,.24,1)}" +
